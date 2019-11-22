@@ -13,7 +13,7 @@ const char * preconfigured_peers_key = "preconfigured_peers";
 const char * signature_checker_threads_key = "signature_checker_threads";
 const char * pow_sleep_interval_key = "pow_sleep_interval";
 const char * default_beta_peer_network = "::ffff:206.189.143.185";
-const char * default_live_peer_network = "peering.bitcoin.black";
+const char * default_live_peer_network = "peers.bitcoin.black";
 }
 
 nano::node_config::node_config () :
@@ -42,11 +42,6 @@ logging (logging_a)
 			break;
 		case nano::nano_networks::btcb_beta_network:
 			preconfigured_peers.push_back (default_beta_peer_network);
-			// preconfigured_peers.push_back ("::ffff:167.99.229.16");
-			// preconfigured_peers.push_back ("::ffff:138.68.252.73");
-			// preconfigured_peers.push_back ("::ffff:188.166.58.251");
-			// preconfigured_peers.push_back ("::ffff:128.199.150.115");
-			// preconfigured_peers.push_back ("::ffff:68.183.47.36");
 
 			preconfigured_representatives.emplace_back ("C81A2189F0BD0A8FE0E70502FE212159D3CC23DCA166C1A0CA9C04671B2C00B4");
 			preconfigured_representatives.emplace_back ("349301394DB21F309B51B68197175BB28688354D18AD941AAE1ECCDCE0C30971");
@@ -57,6 +52,13 @@ logging (logging_a)
 			break;
 		case nano::nano_networks::btcb_live_network:
 			preconfigured_peers.push_back (default_live_peer_network);
+
+			preconfigured_representatives.emplace_back ("FF2AC2B0E4EF3D2AA41B3B67EB5836B0682314CE3B7C63C0BC78B0517AE3AA93");
+			preconfigured_representatives.emplace_back ("684DA5ADF4550326885E27B139E8435A8C5D1E4E8C20199BD64481EAF91308EE");
+			preconfigured_representatives.emplace_back ("538187D83E25B71B31CF54F56B9DC0D43A9BDB85566A64A83CB656D07D89767F");
+			preconfigured_representatives.emplace_back ("5B88A84337AC04152DA468DAB8B0B63316812CB7959CAD9EDBCA9A34C739FB6B");
+			preconfigured_representatives.emplace_back ("DC32B7BF5D5C748A60C712371BC286F92C14339A4E9589D1BD8272248F1BBC36");
+			preconfigured_representatives.emplace_back ("FF45C09B8F64BE521CACD943B5072DCC7E902679962CE0DB08D44BA38C12CD2B");
 
 			break;
 		default:
