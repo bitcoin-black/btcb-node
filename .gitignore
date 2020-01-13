@@ -40,6 +40,7 @@ slow_test
 !slow_test/
 btcb_rpc
 !btcb_rpc/
+load_test
 
 # IDEs
 .idea

@@ -63,6 +63,7 @@ public:
 	void delegators ();
 	void delegators_count ();
 	void deterministic_key ();
+	void epoch_upgrade ();
 	void frontiers ();
 	void keepalive ();
 	void key_create ();
@@ -143,7 +144,8 @@ public:
 	std::shared_ptr<nano::wallet> wallet_impl ();
 	bool wallet_locked_impl (nano::transaction const &, std::shared_ptr<nano::wallet>);
 	bool wallet_account_impl (nano::transaction const &, std::shared_ptr<nano::wallet>, nano::account const &);
-	nano::account account_impl (std::string = "");
+	nano::account account_impl (std::string = "", std::error_code = nano::error_common::bad_account_number);
+	nano::account_info account_info_impl (nano::transaction const &, nano::account const &);
 	nano::amount amount_impl ();
 	std::shared_ptr<nano::block> block_impl (bool = true);
 	std::shared_ptr<nano::block> block_json_impl (bool = true);
@@ -153,6 +155,8 @@ public:
 	uint64_t count_impl ();
 	uint64_t count_optional_impl (uint64_t = std::numeric_limits<uint64_t>::max ());
 	uint64_t offset_optional_impl (uint64_t = 0);
+	uint64_t difficulty_optional_impl ();
+	double multiplier_optional_impl (uint64_t &);
 	bool enable_sign_hash{ false };
 	std::function<void()> stop_callback;
 	nano::node_rpc_config const & node_rpc_config;

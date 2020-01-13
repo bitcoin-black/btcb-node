@@ -40,6 +40,7 @@ TEST (message, keepalive_deserialize)
 
 TEST (message, publish_serialization)
 {
+	nano::network_params params;
 	nano::publish publish (std::make_shared<nano::send_block> (0, 1, 2, nano::keypair ().prv, 4, 5));
 	ASSERT_EQ (nano::block_type::send, publish.header.block_type ());
 	std::vector<uint8_t> bytes;
@@ -50,9 +51,9 @@ TEST (message, publish_serialization)
 	ASSERT_EQ (8, bytes.size ());
 	ASSERT_EQ (0x52, bytes[0]);
 	ASSERT_EQ (0x41, bytes[1]);
-	ASSERT_EQ (nano::protocol_version, bytes[2]);
-	ASSERT_EQ (nano::protocol_version, bytes[3]);
-	ASSERT_EQ (nano::protocol_version_min, bytes[4]);
+	ASSERT_EQ (params.protocol.protocol_version, bytes[2]);
+	ASSERT_EQ (params.protocol.protocol_version, bytes[3]);
+	ASSERT_EQ (params.protocol.protocol_version_min, bytes[4]);
 	ASSERT_EQ (static_cast<uint8_t> (nano::message_type::publish), bytes[5]);
 	ASSERT_EQ (0x00, bytes[6]); // extensions
 	ASSERT_EQ (static_cast<uint8_t> (nano::block_type::send), bytes[7]);
@@ -60,9 +61,9 @@ TEST (message, publish_serialization)
 	auto error (false);
 	nano::message_header header (error, stream);
 	ASSERT_FALSE (error);
-	ASSERT_EQ (nano::protocol_version_min, header.version_min);
-	ASSERT_EQ (nano::protocol_version, header.version_using);
-	ASSERT_EQ (nano::protocol_version, header.version_max);
+	ASSERT_EQ (params.protocol.protocol_version_min, header.version_min);
+	ASSERT_EQ (params.protocol.protocol_version, header.version_using);
+	ASSERT_EQ (params.protocol.protocol_version, header.version_max);
 	ASSERT_EQ (nano::message_type::publish, header.type);
 }
 
@@ -91,8 +92,9 @@ TEST (message, confirm_ack_hash_serialization)
 	for (auto i (hashes.size ()); i < 12; i++)
 	{
 		nano::keypair key1;
-		nano::keypair previous;
-		nano::state_block block (key1.pub, previous.pub, key1.pub, 2, 4, key1.prv, key1.pub, 5);
+		nano::block_hash previous;
+		nano::random_pool::generate_block (previous.bytes.data (), previous.bytes.size ());
+		nano::state_block block (key1.pub, previous, key1.pub, 2, 4, key1.prv, key1.pub, 5);
 		hashes.push_back (block.hash ());
 	}
 	nano::keypair representative1;
@@ -166,14 +168,15 @@ TEST (message, confirm_req_hash_batch_serialization)
 {
 	nano::keypair key;
 	nano::keypair representative;
-	std::vector<std::pair<nano::block_hash, nano::block_hash>> roots_hashes;
+	std::vector<std::pair<nano::block_hash, nano::root>> roots_hashes;
 	nano::state_block open (key.pub, 0, representative.pub, 2, 4, key.prv, key.pub, 5);
 	roots_hashes.push_back (std::make_pair (open.hash (), open.root ()));
 	for (auto i (roots_hashes.size ()); i < 7; i++)
 	{
 		nano::keypair key1;
-		nano::keypair previous;
-		nano::state_block block (key1.pub, previous.pub, representative.pub, 2, 4, key1.prv, key1.pub, 5);
+		nano::block_hash previous;
+		nano::random_pool::generate_block (previous.bytes.data (), previous.bytes.size ());
+		nano::state_block block (key1.pub, previous, representative.pub, 2, 4, key1.prv, key1.pub, 5);
 		roots_hashes.push_back (std::make_pair (block.hash (), block.root ()));
 	}
 	roots_hashes.push_back (std::make_pair (open.hash (), open.root ()));

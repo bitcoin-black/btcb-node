@@ -5,8 +5,8 @@ target_link_libraries (btcb_rpc
 	rpc
 	secure
 	Boost::filesystem
-	Boost::log
 	Boost::log_setup
+	Boost::log
 	Boost::program_options
 	Boost::system
 	Boost::thread
@@ -16,9 +16,8 @@ target_compile_definitions(btcb_rpc
 	PUBLIC
 		-DACTIVE_NETWORK=${ACTIVE_NETWORK}
 	PRIVATE
-		-DBTCB_VERSION_MAJOR=${CPACK_PACKAGE_VERSION_MAJOR}
-		-DBTCB_VERSION_MINOR=${CPACK_PACKAGE_VERSION_MINOR}
-		-DBTCB_VERSION_PATCH=${CPACK_PACKAGE_VERSION_PATCH})
+		-DTAG_VERSION_STRING=${TAG_VERSION_STRING}
+		-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH})
 
 if ((BTCB_GUI OR RAIBLOCKS_GUI) AND NOT APPLE)
 	install(TARGETS btcb_rpc

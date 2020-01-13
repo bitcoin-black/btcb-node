@@ -5,7 +5,7 @@
 
 #include <future>
 
-bool nano::work_validate (nano::block_hash const & root_a, uint64_t work_a, uint64_t * difficulty_a)
+bool nano::work_validate (nano::root const & root_a, uint64_t work_a, uint64_t * difficulty_a)
 {
 	static nano::network_constants network_constants;
 	auto value (nano::work_value (root_a, work_a));
@@ -21,7 +21,7 @@ bool nano::work_validate (nano::block const & block_a, uint64_t * difficulty_a)
 	return work_validate (block_a.root (), block_a.block_work (), difficulty_a);
 }
 
-uint64_t nano::work_value (nano::block_hash const & root_a, uint64_t work_a)
+uint64_t nano::work_value (nano::root const & root_a, uint64_t work_a)
 {
 	uint64_t result;
 	blake2b_state hash;
@@ -32,7 +32,7 @@ uint64_t nano::work_value (nano::block_hash const & root_a, uint64_t work_a)
 	return result;
 }
 
-nano::work_pool::work_pool (unsigned max_threads_a, std::chrono::nanoseconds pow_rate_limiter_a, std::function<boost::optional<uint64_t> (nano::uint256_union const &, uint64_t)> opencl_a) :
+nano::work_pool::work_pool (unsigned max_threads_a, std::chrono::nanoseconds pow_rate_limiter_a, std::function<boost::optional<uint64_t> (nano::root const &, uint64_t, std::atomic<int> &)> opencl_a) :
 ticket (0),
 done (false),
 pow_rate_limiter (pow_rate_limiter_a),
@@ -41,7 +41,12 @@ opencl (opencl_a)
 	static_assert (ATOMIC_INT_LOCK_FREE == 2, "Atomic int needed");
 	boost::thread::attributes attrs;
 	nano::thread_attributes::set (attrs);
-	auto count (network_constants.is_test_network () ? 1 : std::min (max_threads_a, std::max (1u, boost::thread::hardware_concurrency ())));
+	auto count (network_constants.is_test_network () ? std::min (max_threads_a, 1u) : std::min (max_threads_a, std::max (1u, boost::thread::hardware_concurrency ())));
+	if (opencl)
+	{
+		// One thread to handle OpenCL
+		++count;
+	}
 	for (auto i (0u); i < count; ++i)
 	{
 		auto thread (boost::thread (attrs, [this, i]() {
@@ -71,9 +76,9 @@ void nano::work_pool::loop (uint64_t thread)
 	uint64_t output;
 	blake2b_state hash;
 	blake2b_init (&hash, sizeof (output));
-	std::unique_lock<std::mutex> lock (mutex);
+	nano::unique_lock<std::mutex> lock (mutex);
 	auto pow_sleep = pow_rate_limiter;
-	while (!done || !pending.empty ())
+	while (!done)
 	{
 		auto empty (pending.empty ());
 		if (thread == 0)
@@ -87,27 +92,40 @@ void nano::work_pool::loop (uint64_t thread)
 			int ticket_l (ticket);
 			lock.unlock ();
 			output = 0;
-			// ticket != ticket_l indicates a different thread found a solution and we should stop
-			while (ticket == ticket_l && output < current_l.difficulty)
+			boost::optional<uint64_t> opt_work;
+			if (thread == 0 && opencl)
 			{
-				// Don't query main memory every iteration in order to reduce memory bus traffic
-				// All operations here operate on stack memory
-				// Count iterations down to zero since comparing to zero is easier than comparing to another number
-				unsigned iteration (256);
-				while (iteration && output < current_l.difficulty)
+				opt_work = opencl (current_l.item, current_l.difficulty, ticket);
+			}
+			if (opt_work.is_initialized ())
+			{
+				work = *opt_work;
+				output = work_value (current_l.item, work);
+			}
+			else
+			{
+				// ticket != ticket_l indicates a different thread found a solution and we should stop
+				while (ticket == ticket_l && output < current_l.difficulty)
 				{
-					work = rng.next ();
-					blake2b_update (&hash, reinterpret_cast<uint8_t *> (&work), sizeof (work));
-					blake2b_update (&hash, current_l.item.bytes.data (), current_l.item.bytes.size ());
-					blake2b_final (&hash, reinterpret_cast<uint8_t *> (&output), sizeof (output));
-					blake2b_init (&hash, sizeof (output));
-					iteration -= 1;
-				}
+					// Don't query main memory every iteration in order to reduce memory bus traffic
+					// All operations here operate on stack memory
+					// Count iterations down to zero since comparing to zero is easier than comparing to another number
+					unsigned iteration (256);
+					while (iteration && output < current_l.difficulty)
+					{
+						work = rng.next ();
+						blake2b_update (&hash, reinterpret_cast<uint8_t *> (&work), sizeof (work));
+						blake2b_update (&hash, current_l.item.bytes.data (), current_l.item.bytes.size ());
+						blake2b_final (&hash, reinterpret_cast<uint8_t *> (&output), sizeof (output));
+						blake2b_init (&hash, sizeof (output));
+						iteration -= 1;
+					}
 
-				// Add a rate limiter (if specified) to the pow calculation to save some CPUs which don't want to operate at full throttle
-				if (pow_sleep != std::chrono::nanoseconds (0))
-				{
-					std::this_thread::sleep_for (pow_sleep);
+					// Add a rate limiter (if specified) to the pow calculation to save some CPUs which don't want to operate at full throttle
+					if (pow_sleep != std::chrono::nanoseconds (0))
+					{
+						std::this_thread::sleep_for (pow_sleep);
+					}
 				}
 			}
 			lock.lock ();
@@ -136,84 +154,92 @@ void nano::work_pool::loop (uint64_t thread)
 	}
 }
 
-void nano::work_pool::cancel (nano::uint256_union const & root_a)
+void nano::work_pool::cancel (nano::root const & root_a)
 {
-	std::lock_guard<std::mutex> lock (mutex);
-	if (!pending.empty ())
+	nano::lock_guard<std::mutex> lock (mutex);
+	if (!done)
 	{
-		if (pending.front ().item == root_a)
+		if (!pending.empty ())
 		{
-			++ticket;
+			if (pending.front ().item == root_a)
+			{
+				++ticket;
+			}
 		}
+		pending.remove_if ([&root_a](decltype (pending)::value_type const & item_a) {
+			bool result{ false };
+			if (item_a.item == root_a)
+			{
+				if (item_a.callback)
+				{
+					item_a.callback (boost::none);
+				}
+				result = true;
+			}
+			return result;
+		});
 	}
-	pending.remove_if ([&root_a](decltype (pending)::value_type const & item_a) {
-		bool result;
-		if (item_a.item == root_a)
-		{
-			item_a.callback (boost::none);
-			result = true;
-		}
-		else
-		{
-			result = false;
-		}
-		return result;
-	});
 }
 
 void nano::work_pool::stop ()
 {
 	{
-		std::lock_guard<std::mutex> lock (mutex);
+		nano::lock_guard<std::mutex> lock (mutex);
 		done = true;
+		++ticket;
 	}
 	producer_condition.notify_all ();
 }
 
-void nano::work_pool::generate (nano::uint256_union const & hash_a, std::function<void(boost::optional<uint64_t> const &)> callback_a)
+void nano::work_pool::generate (nano::root const & root_a, std::function<void(boost::optional<uint64_t> const &)> callback_a)
 {
-	generate (hash_a, callback_a, network_constants.publish_threshold);
+	generate (root_a, callback_a, network_constants.publish_threshold);
 }
 
-void nano::work_pool::generate (nano::uint256_union const & hash_a, std::function<void(boost::optional<uint64_t> const &)> callback_a, uint64_t difficulty_a)
+void nano::work_pool::generate (nano::root const & root_a, std::function<void(boost::optional<uint64_t> const &)> callback_a, uint64_t difficulty_a)
 {
-	assert (!hash_a.is_zero ());
-	boost::optional<uint64_t> result;
-	if (opencl)
-	{
-		result = opencl (hash_a, difficulty_a);
-	}
-	if (!result)
+	assert (!root_a.is_zero ());
+	if (!threads.empty ())
 	{
 		{
-			std::lock_guard<std::mutex> lock (mutex);
-			pending.push_back ({ hash_a, callback_a, difficulty_a });
+			nano::lock_guard<std::mutex> lock (mutex);
+			pending.push_back ({ root_a, callback_a, difficulty_a });
 		}
 		producer_condition.notify_all ();
 	}
-	else
+	else if (callback_a)
 	{
-		callback_a (result);
+		callback_a (boost::none);
 	}
 }
 
-uint64_t nano::work_pool::generate (nano::uint256_union const & hash_a)
+boost::optional<uint64_t> nano::work_pool::generate (nano::root const & root_a)
 {
-	return generate (hash_a, network_constants.publish_threshold);
+	return generate (root_a, network_constants.publish_threshold);
 }
 
-uint64_t nano::work_pool::generate (nano::uint256_union const & hash_a, uint64_t difficulty_a)
+boost::optional<uint64_t> nano::work_pool::generate (nano::root const & root_a, uint64_t difficulty_a)
 {
-	std::promise<boost::optional<uint64_t>> work;
-	std::future<boost::optional<uint64_t>> future = work.get_future ();
-	// clang-format off
-	generate (hash_a, [&work](boost::optional<uint64_t> work_a) {
-		work.set_value (work_a);
-	},
-	difficulty_a);
-	// clang-format on
-	auto result (future.get ());
-	return result.value ();
+	boost::optional<uint64_t> result;
+	if (!threads.empty ())
+	{
+		std::promise<boost::optional<uint64_t>> work;
+		std::future<boost::optional<uint64_t>> future = work.get_future ();
+		// clang-format off
+		generate (root_a, [&work](boost::optional<uint64_t> work_a) {
+			work.set_value (work_a);
+		},
+		difficulty_a);
+		// clang-format on
+		result = future.get ().value ();
+	}
+	return result;
+}
+
+size_t nano::work_pool::size ()
+{
+	nano::lock_guard<std::mutex> lock (mutex);
+	return pending.size ();
 }
 
 namespace nano
@@ -224,7 +250,7 @@ std::unique_ptr<seq_con_info_component> collect_seq_con_info (work_pool & work_p
 
 	size_t count = 0;
 	{
-		std::lock_guard<std::mutex> guard (work_pool.mutex);
+		nano::lock_guard<std::mutex> guard (work_pool.mutex);
 		count = work_pool.pending.size ();
 	}
 	auto sizeof_element = sizeof (decltype (work_pool.pending)::value_type);

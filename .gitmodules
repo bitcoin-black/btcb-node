@@ -15,3 +15,9 @@
 	path = gtest
 	url = https://github.com/google/googletest.git
 	branch = v1.8.x
+[submodule "cpptoml"]
+	path = cpptoml
+	url = https://github.com/cryptocode/cpptoml.git
+[submodule "nano-pow-server"]
+	path = nano-pow-server
+	url = https://github.com/nanocurrency/nano-pow-server.git

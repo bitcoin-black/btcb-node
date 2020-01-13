@@ -76,7 +76,7 @@ size_t nano::block::size (nano::block_type type_a)
 
 nano::block_hash nano::block::hash () const
 {
-	nano::uint256_union result;
+	nano::block_hash result;
 	blake2b_state hash_l;
 	auto status (blake2b_init (&hash_l, sizeof (result.bytes)));
 	assert (status == 0);
@@ -100,29 +100,39 @@ nano::block_hash nano::block::full_hash () const
 	return result;
 }
 
-nano::account nano::block::representative () const
+nano::account const & nano::block::representative () const
 {
-	return 0;
+	static nano::account rep{ 0 };
+	return rep;
 }
 
-nano::block_hash nano::block::source () const
+nano::block_hash const & nano::block::source () const
 {
-	return 0;
+	static nano::block_hash source{ 0 };
+	return source;
 }
 
-nano::block_hash nano::block::link () const
+nano::link const & nano::block::link () const
 {
-	return 0;
+	static nano::link link{ 0 };
+	return link;
 }
 
-nano::account nano::block::account () const
+nano::account const & nano::block::account () const
 {
-	return 0;
+	static nano::account account{ 0 };
+	return account;
 }
 
 nano::qualified_root nano::block::qualified_root () const
 {
 	return nano::qualified_root (previous (), root ());
+}
+
+nano::amount const & nano::block::balance () const
+{
+	static nano::amount amount{ 0 };
+	return amount;
 }
 
 void nano::send_block::visit (nano::block_visitor & visitor_a) const
@@ -227,12 +237,12 @@ bool nano::send_block::deserialize (nano::stream & stream_a)
 	return error;
 }
 
-void nano::send_block::serialize_json (std::string & string_a) const
+void nano::send_block::serialize_json (std::string & string_a, bool single_line) const
 {
 	boost::property_tree::ptree tree;
 	serialize_json (tree);
 	std::stringstream ostream;
-	boost::property_tree::write_json (ostream, tree);
+	boost::property_tree::write_json (ostream, tree, !single_line);
 	string_a = ostream.str ();
 }
 
@@ -368,22 +378,27 @@ bool nano::send_block::operator== (nano::send_block const & other_a) const
 	return result;
 }
 
-nano::block_hash nano::send_block::previous () const
+nano::block_hash const & nano::send_block::previous () const
 {
 	return hashables.previous;
 }
 
-nano::block_hash nano::send_block::root () const
+nano::root const & nano::send_block::root () const
 {
 	return hashables.previous;
 }
 
-nano::signature nano::send_block::block_signature () const
+nano::amount const & nano::send_block::balance () const
+{
+	return hashables.balance;
+}
+
+nano::signature const & nano::send_block::block_signature () const
 {
 	return signature;
 }
 
-void nano::send_block::signature_set (nano::uint512_union const & signature_a)
+void nano::send_block::signature_set (nano::signature const & signature_a)
 {
 	signature = signature_a;
 }
@@ -508,13 +523,13 @@ void nano::open_block::block_work_set (uint64_t work_a)
 	work = work_a;
 }
 
-nano::block_hash nano::open_block::previous () const
+nano::block_hash const & nano::open_block::previous () const
 {
-	nano::block_hash result (0);
+	static nano::block_hash result{ 0 };
 	return result;
 }
 
-nano::account nano::open_block::account () const
+nano::account const & nano::open_block::account () const
 {
 	return hashables.account;
 }
@@ -547,12 +562,12 @@ bool nano::open_block::deserialize (nano::stream & stream_a)
 	return error;
 }
 
-void nano::open_block::serialize_json (std::string & string_a) const
+void nano::open_block::serialize_json (std::string & string_a, bool single_line) const
 {
 	boost::property_tree::ptree tree;
 	serialize_json (tree);
 	std::stringstream ostream;
-	boost::property_tree::write_json (ostream, tree);
+	boost::property_tree::write_json (ostream, tree, !single_line);
 	string_a = ostream.str ();
 }
 
@@ -629,27 +644,27 @@ bool nano::open_block::valid_predecessor (nano::block const & block_a) const
 	return false;
 }
 
-nano::block_hash nano::open_block::source () const
+nano::block_hash const & nano::open_block::source () const
 {
 	return hashables.source;
 }
 
-nano::block_hash nano::open_block::root () const
+nano::root const & nano::open_block::root () const
 {
 	return hashables.account;
 }
 
-nano::account nano::open_block::representative () const
+nano::account const & nano::open_block::representative () const
 {
 	return hashables.representative;
 }
 
-nano::signature nano::open_block::block_signature () const
+nano::signature const & nano::open_block::block_signature () const
 {
 	return signature;
 }
 
-void nano::open_block::signature_set (nano::uint512_union const & signature_a)
+void nano::open_block::signature_set (nano::signature const & signature_a)
 {
 	signature = signature_a;
 }
@@ -758,7 +773,7 @@ void nano::change_block::block_work_set (uint64_t work_a)
 	work = work_a;
 }
 
-nano::block_hash nano::change_block::previous () const
+nano::block_hash const & nano::change_block::previous () const
 {
 	return hashables.previous;
 }
@@ -789,12 +804,12 @@ bool nano::change_block::deserialize (nano::stream & stream_a)
 	return error;
 }
 
-void nano::change_block::serialize_json (std::string & string_a) const
+void nano::change_block::serialize_json (std::string & string_a, bool single_line) const
 {
 	boost::property_tree::ptree tree;
 	serialize_json (tree);
 	std::stringstream ostream;
-	boost::property_tree::write_json (ostream, tree);
+	boost::property_tree::write_json (ostream, tree, !single_line);
 	string_a = ostream.str ();
 }
 
@@ -878,27 +893,27 @@ bool nano::change_block::valid_predecessor (nano::block const & block_a) const
 	return result;
 }
 
-nano::block_hash nano::change_block::root () const
+nano::root const & nano::change_block::root () const
 {
 	return hashables.previous;
 }
 
-nano::account nano::change_block::representative () const
+nano::account const & nano::change_block::representative () const
 {
 	return hashables.representative;
 }
 
-nano::signature nano::change_block::block_signature () const
+nano::signature const & nano::change_block::block_signature () const
 {
 	return signature;
 }
 
-void nano::change_block::signature_set (nano::uint512_union const & signature_a)
+void nano::change_block::signature_set (nano::signature const & signature_a)
 {
 	signature = signature_a;
 }
 
-nano::state_hashables::state_hashables (nano::account const & account_a, nano::block_hash const & previous_a, nano::account const & representative_a, nano::amount const & balance_a, nano::uint256_union const & link_a) :
+nano::state_hashables::state_hashables (nano::account const & account_a, nano::block_hash const & previous_a, nano::account const & representative_a, nano::amount const & balance_a, nano::link const & link_a) :
 account (account_a),
 previous (previous_a),
 representative (representative_a),
@@ -965,7 +980,7 @@ void nano::state_hashables::hash (blake2b_state & hash_a) const
 	blake2b_update (&hash_a, link.bytes.data (), sizeof (link.bytes));
 }
 
-nano::state_block::state_block (nano::account const & account_a, nano::block_hash const & previous_a, nano::account const & representative_a, nano::amount const & balance_a, nano::uint256_union const & link_a, nano::raw_key const & prv_a, nano::public_key const & pub_a, uint64_t work_a) :
+nano::state_block::state_block (nano::account const & account_a, nano::block_hash const & previous_a, nano::account const & representative_a, nano::amount const & balance_a, nano::link const & link_a, nano::raw_key const & prv_a, nano::public_key const & pub_a, uint64_t work_a) :
 hashables (account_a, previous_a, representative_a, balance_a, link_a),
 signature (nano::sign_message (prv_a, pub_a, hash ())),
 work (work_a)
@@ -1034,12 +1049,12 @@ void nano::state_block::block_work_set (uint64_t work_a)
 	work = work_a;
 }
 
-nano::block_hash nano::state_block::previous () const
+nano::block_hash const & nano::state_block::previous () const
 {
 	return hashables.previous;
 }
 
-nano::account nano::state_block::account () const
+nano::account const & nano::state_block::account () const
 {
 	return hashables.account;
 }
@@ -1077,12 +1092,12 @@ bool nano::state_block::deserialize (nano::stream & stream_a)
 	return error;
 }
 
-void nano::state_block::serialize_json (std::string & string_a) const
+void nano::state_block::serialize_json (std::string & string_a, bool single_line) const
 {
 	boost::property_tree::ptree tree;
 	serialize_json (tree);
 	std::stringstream ostream;
-	boost::property_tree::write_json (ostream, tree);
+	boost::property_tree::write_json (ostream, tree, !single_line);
 	string_a = ostream.str ();
 }
 
@@ -1172,27 +1187,39 @@ bool nano::state_block::valid_predecessor (nano::block const & block_a) const
 	return true;
 }
 
-nano::block_hash nano::state_block::root () const
+nano::root const & nano::state_block::root () const
 {
-	return !hashables.previous.is_zero () ? hashables.previous : hashables.account;
+	if (!hashables.previous.is_zero ())
+	{
+		return hashables.previous;
+	}
+	else
+	{
+		return hashables.account;
+	}
 }
 
-nano::block_hash nano::state_block::link () const
+nano::link const & nano::state_block::link () const
 {
 	return hashables.link;
 }
 
-nano::account nano::state_block::representative () const
+nano::account const & nano::state_block::representative () const
 {
 	return hashables.representative;
 }
 
-nano::signature nano::state_block::block_signature () const
+nano::amount const & nano::state_block::balance () const
+{
+	return hashables.balance;
+}
+
+nano::signature const & nano::state_block::block_signature () const
 {
 	return signature;
 }
 
-void nano::state_block::signature_set (nano::uint512_union const & signature_a)
+void nano::state_block::signature_set (nano::signature const & signature_a)
 {
 	signature = signature_a;
 }
@@ -1349,12 +1376,12 @@ bool nano::receive_block::deserialize (nano::stream & stream_a)
 	return error;
 }
 
-void nano::receive_block::serialize_json (std::string & string_a) const
+void nano::receive_block::serialize_json (std::string & string_a, bool single_line) const
 {
 	boost::property_tree::ptree tree;
 	serialize_json (tree);
 	std::stringstream ostream;
-	boost::property_tree::write_json (ostream, tree);
+	boost::property_tree::write_json (ostream, tree, !single_line);
 	string_a = ostream.str ();
 }
 
@@ -1488,27 +1515,27 @@ bool nano::receive_block::valid_predecessor (nano::block const & block_a) const
 	return result;
 }
 
-nano::block_hash nano::receive_block::previous () const
+nano::block_hash const & nano::receive_block::previous () const
 {
 	return hashables.previous;
 }
 
-nano::block_hash nano::receive_block::source () const
+nano::block_hash const & nano::receive_block::source () const
 {
 	return hashables.source;
 }
 
-nano::block_hash nano::receive_block::root () const
+nano::root const & nano::receive_block::root () const
 {
 	return hashables.previous;
 }
 
-nano::signature nano::receive_block::block_signature () const
+nano::signature const & nano::receive_block::block_signature () const
 {
 	return signature;
 }
 
-void nano::receive_block::signature_set (nano::uint512_union const & signature_a)
+void nano::receive_block::signature_set (nano::signature const & signature_a)
 {
 	signature = signature_a;
 }
@@ -1567,7 +1594,7 @@ std::shared_ptr<nano::block> nano::block_uniquer::unique (std::shared_ptr<nano::
 	if (result != nullptr)
 	{
 		nano::uint256_union key (block_a->full_hash ());
-		std::lock_guard<std::mutex> lock (mutex);
+		nano::lock_guard<std::mutex> lock (mutex);
 		auto & existing (blocks[key]);
 		if (auto block_l = existing.lock ())
 		{
@@ -1604,7 +1631,7 @@ std::shared_ptr<nano::block> nano::block_uniquer::unique (std::shared_ptr<nano::
 
 size_t nano::block_uniquer::size ()
 {
-	std::lock_guard<std::mutex> lock (mutex);
+	nano::lock_guard<std::mutex> lock (mutex);
 	return blocks.size ();
 }
 

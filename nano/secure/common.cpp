@@ -28,6 +28,7 @@ char const * test_private_key_data = "78D3987861F8AA0F1EEB460928A13D58A358EBDB01
 char const * test_public_key_data = "26832C3736F96BC5BD1D567EB2A52A798D801B11E44B443B9BC4A3C37C53FBE7"; // bcb_1bn57iumfyddrpyjtomypckknyefi1fj5s4daixsqj75rfy79yz9txiyauj8
 char const * beta_public_key_data = "C81A2189F0BD0A8FE0E70502FE212159D3CC23DCA166C1A0CA9C04671B2C00B4"; // bcb_3k1t686z3hacjzigg3a4zrik4pgmsijxsad8r8ieo916ewfkr17n4wos8yq9
 char const * live_public_key_data = "878B7673542CE60607CFB274A77FDB6F90C318860229AD1073AA2904D345BC24"; // bcb_33wdgssoad981r5wzemnnxzxpuwireeae1jbona99cjb1mbndh36uytbxotd
+
 char const * test_genesis_data = R"%%%({
 	"type": "open",
     "source": "26832C3736F96BC5BD1D567EB2A52A798D801B11E44B443B9BC4A3C37C53FBE7",
@@ -62,12 +63,16 @@ network_params (network_constants::active_network)
 }
 
 nano::network_params::network_params (nano::nano_networks network_a) :
-network (network_a), ledger (network), voting (network), node (network), portmapping (network), bootstrap (network)
+network (network_a), protocol (network_a), ledger (network), voting (network), node (network), portmapping (network), bootstrap (network)
 {
 	unsigned constexpr kdf_full_work = 64 * 1024;
 	unsigned constexpr kdf_test_work = 8;
 	kdf_work = network.is_test_network () ? kdf_test_work : kdf_full_work;
-	header_magic_number = network.is_test_network () ? std::array<uint8_t, 2>{ { 'R', 'A' } } : network.is_beta_network () ? std::array<uint8_t, 2>{ { 'R', 'B' } } : std::array<uint8_t, 2>{ { 'R', 'C' } };
+	header_magic_number = network.is_test_network () ? std::array<uint8_t, 2>{ { 'R', 'A' } } : network.is_beta_network () ? std::array<uint8_t, 2>{ { 'N', 'B' } } : std::array<uint8_t, 2>{ { 'R', 'C' } };
+}
+
+nano::protocol_constants::protocol_constants (nano::nano_networks network_a)
+{
 }
 
 nano::ledger_constants::ledger_constants (nano::network_constants & network_constants) :
@@ -89,6 +94,17 @@ genesis_block (network_a == nano::nano_networks::btcb_test_network ? nano_test_g
 genesis_amount (std::numeric_limits<nano::uint128_t>::max ()),
 burn_account (0)
 {
+	nano::link epoch_link_v1;
+	const char * epoch_message_v1 ("epoch v1 block");
+	strncpy ((char *)epoch_link_v1.bytes.data (), epoch_message_v1, epoch_link_v1.bytes.size ());
+	epochs.add (nano::epoch::epoch_1, genesis_account, epoch_link_v1);
+
+	nano::link epoch_link_v2;
+	auto nano_live_epoch_v2_signer = genesis_account;
+	auto epoch_v2_signer (network_a == nano::nano_networks::btcb_test_network ? nano_test_account : network_a == nano::nano_networks::btcb_beta_network ? nano_beta_account : nano_live_epoch_v2_signer);
+	const char * epoch_message_v2 ("epoch v2 block");
+	strncpy ((char *)epoch_link_v2.bytes.data (), epoch_message_v2, epoch_link_v2.bytes.size ());
+	epochs.add (nano::epoch::epoch_2, epoch_v2_signer, epoch_link_v2);
 }
 
 nano::random_constants::random_constants ()
@@ -107,7 +123,7 @@ nano::node_constants::node_constants (nano::network_constants & network_constant
 	backup_interval = std::chrono::minutes (5);
 	search_pending_interval = network_constants.is_test_network () ? std::chrono::seconds (1) : std::chrono::seconds (5 * 60);
 	peer_interval = search_pending_interval;
-	unchecked_cleaning_interval = std::chrono::hours (2);
+	unchecked_cleaning_interval = std::chrono::minutes (30);
 	process_confirmed_interval = network_constants.is_test_network () ? std::chrono::milliseconds (50) : std::chrono::milliseconds (500);
 	max_weight_samples = network_constants.is_live_network () ? 4032 : 864;
 	weight_period = 5 * 60; // 5 minutes
@@ -115,7 +131,7 @@ nano::node_constants::node_constants (nano::network_constants & network_constant
 
 nano::voting_constants::voting_constants (nano::network_constants & network_constants)
 {
-	max_cache = network_constants.is_test_network () ? 2 : 1000;
+	max_cache = network_constants.is_test_network () ? 2 : 4 * 1024;
 }
 
 nano::portmapping_constants::portmapping_constants (nano::network_constants & network_constants)
@@ -127,6 +143,10 @@ nano::portmapping_constants::portmapping_constants (nano::network_constants & ne
 nano::bootstrap_constants::bootstrap_constants (nano::network_constants & network_constants)
 {
 	lazy_max_pull_blocks = network_constants.is_test_network () ? 2 : 512;
+	lazy_min_pull_blocks = network_constants.is_test_network () ? 1 : 32;
+	frontier_retry_limit = network_constants.is_test_network () ? 2 : 16;
+	lazy_retry_limit = network_constants.is_test_network () ? 2 : frontier_retry_limit * 10;
+	lazy_destinations_retry_limit = network_constants.is_test_network () ? 1 : frontier_retry_limit / 4;
 }
 
 /* Convenience constants for core_test which is always on the test network */
@@ -162,6 +182,7 @@ prv (std::move (prv_a))
 nano::keypair::keypair (std::string const & prv_a)
 {
 	auto error (prv.data.decode_hex (prv_a));
+	(void)error;
 	assert (!error);
 	ed25519_publickey (prv.data.bytes.data (), pub.bytes.data ());
 }
@@ -173,15 +194,14 @@ void nano::serialize_block (nano::stream & stream_a, nano::block const & block_a
 	block_a.serialize (stream_a);
 }
 
-nano::account_info::account_info (nano::block_hash const & head_a, nano::block_hash const & rep_block_a, nano::block_hash const & open_block_a, nano::amount const & balance_a, uint64_t modified_a, uint64_t block_count_a, uint64_t confirmation_height_a, nano::epoch epoch_a) :
+nano::account_info::account_info (nano::block_hash const & head_a, nano::account const & representative_a, nano::block_hash const & open_block_a, nano::amount const & balance_a, uint64_t modified_a, uint64_t block_count_a, nano::epoch epoch_a) :
 head (head_a),
-rep_block (rep_block_a),
+representative (representative_a),
 open_block (open_block_a),
 balance (balance_a),
 modified (modified_a),
 block_count (block_count_a),
-confirmation_height (confirmation_height_a),
-epoch (epoch_a)
+epoch_m (epoch_a)
 {
 }
 
@@ -191,12 +211,12 @@ bool nano::account_info::deserialize (nano::stream & stream_a)
 	try
 	{
 		nano::read (stream_a, head.bytes);
-		nano::read (stream_a, rep_block.bytes);
+		nano::read (stream_a, representative.bytes);
 		nano::read (stream_a, open_block.bytes);
 		nano::read (stream_a, balance.bytes);
 		nano::read (stream_a, modified);
 		nano::read (stream_a, block_count);
-		nano::read (stream_a, confirmation_height);
+		nano::read (stream_a, epoch_m);
 	}
 	catch (std::runtime_error const &)
 	{
@@ -208,7 +228,7 @@ bool nano::account_info::deserialize (nano::stream & stream_a)
 
 bool nano::account_info::operator== (nano::account_info const & other_a) const
 {
-	return head == other_a.head && rep_block == other_a.rep_block && open_block == other_a.open_block && balance == other_a.balance && modified == other_a.modified && block_count == other_a.block_count && confirmation_height == other_a.confirmation_height && epoch == other_a.epoch;
+	return head == other_a.head && representative == other_a.representative && open_block == other_a.open_block && balance == other_a.balance && modified == other_a.modified && block_count == other_a.block_count && epoch () == other_a.epoch ();
 }
 
 bool nano::account_info::operator!= (nano::account_info const & other_a) const
@@ -219,18 +239,23 @@ bool nano::account_info::operator!= (nano::account_info const & other_a) const
 size_t nano::account_info::db_size () const
 {
 	assert (reinterpret_cast<const uint8_t *> (this) == reinterpret_cast<const uint8_t *> (&head));
-	assert (reinterpret_cast<const uint8_t *> (&head) + sizeof (head) == reinterpret_cast<const uint8_t *> (&rep_block));
-	assert (reinterpret_cast<const uint8_t *> (&rep_block) + sizeof (rep_block) == reinterpret_cast<const uint8_t *> (&open_block));
+	assert (reinterpret_cast<const uint8_t *> (&head) + sizeof (head) == reinterpret_cast<const uint8_t *> (&representative));
+	assert (reinterpret_cast<const uint8_t *> (&representative) + sizeof (representative) == reinterpret_cast<const uint8_t *> (&open_block));
 	assert (reinterpret_cast<const uint8_t *> (&open_block) + sizeof (open_block) == reinterpret_cast<const uint8_t *> (&balance));
 	assert (reinterpret_cast<const uint8_t *> (&balance) + sizeof (balance) == reinterpret_cast<const uint8_t *> (&modified));
 	assert (reinterpret_cast<const uint8_t *> (&modified) + sizeof (modified) == reinterpret_cast<const uint8_t *> (&block_count));
-	assert (reinterpret_cast<const uint8_t *> (&block_count) + sizeof (block_count) == reinterpret_cast<const uint8_t *> (&confirmation_height));
-	return sizeof (head) + sizeof (rep_block) + sizeof (open_block) + sizeof (balance) + sizeof (modified) + sizeof (block_count) + sizeof (confirmation_height);
+	assert (reinterpret_cast<const uint8_t *> (&block_count) + sizeof (block_count) == reinterpret_cast<const uint8_t *> (&epoch_m));
+	return sizeof (head) + sizeof (representative) + sizeof (open_block) + sizeof (balance) + sizeof (modified) + sizeof (block_count) + sizeof (epoch_m);
+}
+
+nano::epoch nano::account_info::epoch () const
+{
+	return epoch_m;
 }
 
 size_t nano::block_counts::sum () const
 {
-	return send + receive + open + change + state_v0 + state_v1;
+	return send + receive + open + change + state;
 }
 
 nano::pending_info::pending_info (nano::account const & source_a, nano::amount const & amount_a, nano::epoch epoch_a) :
@@ -247,6 +272,7 @@ bool nano::pending_info::deserialize (nano::stream & stream_a)
 	{
 		nano::read (stream_a, source.bytes);
 		nano::read (stream_a, amount.bytes);
+		nano::read (stream_a, epoch);
 	}
 	catch (std::runtime_error const &)
 	{
@@ -254,6 +280,11 @@ bool nano::pending_info::deserialize (nano::stream & stream_a)
 	}
 
 	return error;
+}
+
+size_t nano::pending_info::db_size () const
+{
+	return sizeof (source) + sizeof (amount) + sizeof (epoch);
 }
 
 bool nano::pending_info::operator== (nano::pending_info const & other_a) const
@@ -288,16 +319,17 @@ bool nano::pending_key::operator== (nano::pending_key const & other_a) const
 	return account == other_a.account && hash == other_a.hash;
 }
 
-nano::block_hash nano::pending_key::key () const
+nano::account const & nano::pending_key::key () const
 {
 	return account;
 }
 
-nano::unchecked_info::unchecked_info (std::shared_ptr<nano::block> block_a, nano::account const & account_a, uint64_t modified_a, nano::signature_verification verified_a) :
+nano::unchecked_info::unchecked_info (std::shared_ptr<nano::block> block_a, nano::account const & account_a, uint64_t modified_a, nano::signature_verification verified_a, bool confirmed_a) :
 block (block_a),
 account (account_a),
 modified (modified_a),
-verified (verified_a)
+verified (verified_a),
+confirmed (confirmed_a)
 {
 }
 
@@ -506,9 +538,9 @@ std::string nano::vote::hashes_string () const
 
 const std::string nano::vote::hash_prefix = "vote ";
 
-nano::uint256_union nano::vote::hash () const
+nano::block_hash nano::vote::hash () const
 {
-	nano::uint256_union result;
+	nano::block_hash result;
 	blake2b_state hash;
 	blake2b_init (&hash, sizeof (result.bytes));
 	if (blocks.size () > 1 || (!blocks.empty () && blocks.front ().which ()))
@@ -530,9 +562,9 @@ nano::uint256_union nano::vote::hash () const
 	return result;
 }
 
-nano::uint256_union nano::vote::full_hash () const
+nano::block_hash nano::vote::full_hash () const
 {
-	nano::uint256_union result;
+	nano::block_hash result;
 	blake2b_state state;
 	blake2b_init (&state, sizeof (result.bytes));
 	blake2b_update (&state, hash ().bytes.data (), sizeof (hash ().bytes));
@@ -680,8 +712,8 @@ std::shared_ptr<nano::vote> nano::vote_uniquer::unique (std::shared_ptr<nano::vo
 		{
 			result->blocks.front () = uniquer.unique (boost::get<std::shared_ptr<nano::block>> (result->blocks.front ()));
 		}
-		nano::uint256_union key (vote_a->full_hash ());
-		std::lock_guard<std::mutex> lock (mutex);
+		nano::block_hash key (vote_a->full_hash ());
+		nano::lock_guard<std::mutex> lock (mutex);
 		auto & existing (votes[key]);
 		if (auto block_l = existing.lock ())
 		{
@@ -720,7 +752,7 @@ std::shared_ptr<nano::vote> nano::vote_uniquer::unique (std::shared_ptr<nano::vo
 
 size_t nano::vote_uniquer::size ()
 {
-	std::lock_guard<std::mutex> lock (mutex);
+	nano::lock_guard<std::mutex> lock (mutex);
 	return votes.size ();
 }
 
@@ -749,4 +781,45 @@ nano::genesis::genesis ()
 nano::block_hash nano::genesis::hash () const
 {
 	return open->hash ();
+}
+
+nano::wallet_id nano::random_wallet_id ()
+{
+	nano::wallet_id wallet_id;
+	nano::uint256_union dummy_secret;
+	random_pool::generate_block (dummy_secret.bytes.data (), dummy_secret.bytes.size ());
+	ed25519_publickey (dummy_secret.bytes.data (), wallet_id.bytes.data ());
+	return wallet_id;
+}
+
+nano::unchecked_key::unchecked_key (nano::block_hash const & previous_a, nano::block_hash const & hash_a) :
+previous (previous_a),
+hash (hash_a)
+{
+}
+
+bool nano::unchecked_key::deserialize (nano::stream & stream_a)
+{
+	auto error (false);
+	try
+	{
+		nano::read (stream_a, previous.bytes);
+		nano::read (stream_a, hash.bytes);
+	}
+	catch (std::runtime_error const &)
+	{
+		error = true;
+	}
+
+	return error;
+}
+
+bool nano::unchecked_key::operator== (nano::unchecked_key const & other_a) const
+{
+	return previous == other_a.previous && hash == other_a.hash;
+}
+
+nano::block_hash const & nano::unchecked_key::key () const
+{
+	return previous;
 }

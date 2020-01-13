@@ -41,7 +41,7 @@ void nano_daemon::daemon::run (boost::filesystem::path const & data_path, nano::
 	nano::set_secure_perm_directory (data_path, error_chmod);
 	std::unique_ptr<nano::thread_runner> runner;
 	nano::daemon_config config (data_path);
-	auto error = nano::read_and_update_daemon_config (data_path, config);
+	auto error = nano::read_node_config_toml (data_path, config, flags.config_overrides);
 	nano::set_use_memory_pools (config.node.use_memory_pools);
 	if (!error)
 	{
@@ -49,27 +49,47 @@ void nano_daemon::daemon::run (boost::filesystem::path const & data_path, nano::
 		nano::logger_mt logger{ config.node.logging.min_time_between_log_output };
 		boost::asio::io_context io_ctx;
 		auto opencl (nano::opencl_work::create (config.opencl_enable, config.opencl, logger));
-		nano::work_pool opencl_work (config.node.work_threads, config.node.pow_sleep_interval, opencl ? [&opencl](nano::uint256_union const & root_a, uint64_t difficulty_a) {
-			return opencl->generate_work (root_a, difficulty_a);
+		nano::work_pool opencl_work (config.node.work_threads, config.node.pow_sleep_interval, opencl ? [&opencl](nano::root const & root_a, uint64_t difficulty_a, std::atomic<int> & ticket_a) {
+			return opencl->generate_work (root_a, difficulty_a, ticket_a);
 		}
-		                                                                                              : std::function<boost::optional<uint64_t> (nano::uint256_union const &, uint64_t)> (nullptr));
+		                                                                                              : std::function<boost::optional<uint64_t> (nano::root const &, uint64_t, std::atomic<int> &)> (nullptr));
 		nano::alarm alarm (io_ctx);
-		nano::node_init init;
 		try
 		{
-			auto node (std::make_shared<nano::node> (init, io_ctx, data_path, alarm, config.node, opencl_work, flags));
-			if (!init.error ())
+			auto node (std::make_shared<nano::node> (io_ctx, data_path, alarm, config.node, opencl_work, flags));
+			if (!node->init_error ())
 			{
+				auto database_backend = dynamic_cast<nano::mdb_store *> (node->store_impl.get ()) ? "LMDB" : "RocksDB";
 				auto network_label = node->network_params.network.get_current_network_as_string ();
-				auto version = (BTCB_VERSION_PATCH == 0) ? BTCB_MAJOR_MINOR_VERSION : BTCB_MAJOR_MINOR_RC_VERSION;
-				std::cout << "Network: " << network_label << ", version: " << version << std::endl
-				          << "Path: " << node->application_path.string () << std::endl;
+				std::cout << "Network: " << network_label << ", version: " << BTCB_VERSION_STRING << "\n"
+				          << "Path: " << node->application_path.string () << "\n"
+				          << "Build Info: " << BUILD_INFO << "\n"
+				          << "Database backend: " << database_backend << std::endl;
 
 				node->start ();
 				nano::ipc::ipc_server ipc_server (*node, config.rpc);
 #if BOOST_PROCESS_SUPPORTED
 				std::unique_ptr<boost::process::child> rpc_process;
+				std::unique_ptr<boost::process::child> nano_pow_server_process;
 #endif
+
+				if (config.pow_server.enable)
+				{
+					if (!boost::filesystem::exists (config.pow_server.pow_server_path))
+					{
+						std::cerr << std::string ("nano_pow_server is configured to start as a child process, however the file cannot be found at: ") + config.pow_server.pow_server_path << std::endl;
+						std::exit (1);
+					}
+
+#if BOOST_PROCESS_SUPPORTED
+					auto network = node->network_params.network.get_current_network_as_string ();
+					nano_pow_server_process = std::make_unique<boost::process::child> (config.pow_server.pow_server_path, "--config_path", data_path / "config-nano-pow-server.toml");
+#else
+					std::cerr << "nano_pow_server is configured to start as a child process, but this is not supported on this system. Disable startup and start the server manually." << std::endl;
+					std::exit (1);
+#endif
+				}
+
 				std::unique_ptr<std::thread> rpc_process_thread;
 				std::unique_ptr<nano::rpc> rpc;
 				std::unique_ptr<nano::rpc_handler_interface> rpc_handler;
@@ -79,10 +99,11 @@ void nano_daemon::daemon::run (boost::filesystem::path const & data_path, nano::
 					{
 						// Launch rpc in-process
 						nano::rpc_config rpc_config;
-						auto error = nano::read_and_update_rpc_config (data_path, rpc_config);
+						auto error = nano::read_rpc_config_toml (data_path, rpc_config);
 						if (error)
 						{
-							throw std::runtime_error ("Could not deserialize rpc_config file");
+							std::cout << error.get_message () << std::endl;
+							std::exit (1);
 						}
 						rpc_handler = std::make_unique<nano::inprocess_rpc_handler> (*node, config.rpc, [&ipc_server, &alarm, &io_ctx]() {
 							ipc_server.stop ();

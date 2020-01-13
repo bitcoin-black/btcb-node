@@ -54,6 +54,12 @@ std::string nano::error_common_messages::message (int ev) const
 			return "Bad wallet number";
 		case nano::error_common::bad_work_format:
 			return "Bad work";
+		case nano::error_common::disabled_local_work_generation:
+			return "Local work generation is disabled";
+		case nano::error_common::disabled_work_generation:
+			return "Work generation is disabled";
+		case nano::error_common::failure_work_generation:
+			return "Work generation cancellation or failure";
 		case nano::error_common::insufficient_balance:
 			return "Insufficient balance";
 		case nano::error_common::invalid_amount:
@@ -124,6 +130,8 @@ std::string nano::error_rpc_messages::message (int ev) const
 			return "Bad key";
 		case nano::error_rpc::bad_link:
 			return "Bad link number";
+		case nano::error_rpc::bad_multiplier_format:
+			return "Bad multiplier";
 		case nano::error_rpc::bad_previous:
 			return "Bad previous";
 		case nano::error_rpc::bad_representative_number:
@@ -154,10 +162,18 @@ std::string nano::error_rpc_messages::message (int ev) const
 			return "Active confirmation not found";
 		case nano::error_rpc::difficulty_limit:
 			return "Difficulty above config limit or below publish threshold";
+		case nano::error_rpc::disabled_bootstrap_lazy:
+			return "Lazy bootstrap is disabled";
+		case nano::error_rpc::disabled_bootstrap_legacy:
+			return "Legacy bootstrap is disabled";
 		case nano::error_rpc::invalid_balance:
 			return "Invalid balance number";
 		case nano::error_rpc::invalid_destinations:
 			return "Invalid destinations number";
+		case nano::error_rpc::invalid_epoch:
+			return "Invalid epoch number";
+		case nano::error_rpc::invalid_epoch_signer:
+			return "Incorrect epoch signer";
 		case nano::error_rpc::invalid_offset:
 			return "Invalid offset";
 		case nano::error_rpc::invalid_missing_type:
@@ -234,6 +250,8 @@ std::string nano::error_config_messages::message (int ev) const
 			return "Invalid configuration value";
 		case nano::error_config::missing_value:
 			return "Missing value in configuration";
+		case nano::error_config::rocksdb_enabled_but_not_supported:
+			return "RocksDB has been enabled, but the node has not been built with RocksDB support. Set the CMake flag -DBTCB_ROCKSDB=ON";
 	}
 
 	return "Invalid error code";

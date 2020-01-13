@@ -32,6 +32,9 @@ enum class error_common
 	bad_threshold,
 	bad_wallet_number,
 	bad_work_format,
+	disabled_local_work_generation,
+	disabled_work_generation,
+	failure_work_generation,
 	missing_account,
 	missing_balance,
 	missing_link,
@@ -75,6 +78,7 @@ enum class error_rpc
 	bad_difficulty_format,
 	bad_key,
 	bad_link,
+	bad_multiplier_format,
 	bad_previous,
 	bad_representative_number,
 	bad_source,
@@ -90,8 +94,12 @@ enum class error_rpc
 	confirmation_height_not_processing,
 	confirmation_not_found,
 	difficulty_limit,
+	disabled_bootstrap_lazy,
+	disabled_bootstrap_legacy,
 	invalid_balance,
 	invalid_destinations,
+	invalid_epoch,
+	invalid_epoch_signer,
 	invalid_offset,
 	invalid_missing_type,
 	invalid_root,
@@ -131,6 +139,7 @@ enum class error_config
 	generic = 1,
 	invalid_value,
 	missing_value,
+	rocksdb_enabled_but_not_supported
 };
 } // nano namespace
 

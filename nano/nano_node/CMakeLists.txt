@@ -12,11 +12,14 @@ target_link_libraries (btcb_node
 	${PLATFORM_LIBS}
 )
 
+if (NANO_STACKTRACE_BACKTRACE)
+	target_link_libraries(btcb_node backtrace)
+endif ()
+
 target_compile_definitions(btcb_node
 	PRIVATE
-		-DBTCB_VERSION_MAJOR=${CPACK_PACKAGE_VERSION_MAJOR}
-		-DBTCB_VERSION_MINOR=${CPACK_PACKAGE_VERSION_MINOR}
-		-DBTCB_VERSION_PATCH=${CPACK_PACKAGE_VERSION_PATCH}
+		-DTAG_VERSION_STRING=${TAG_VERSION_STRING}
+		-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH}
 		-DBOOST_PROCESS_SUPPORTED=${BOOST_PROCESS_SUPPORTED})
 
 set_target_properties (btcb_node
@@ -24,7 +27,12 @@ set_target_properties (btcb_node
 		COMPILE_FLAGS
 			"-DQT_NO_KEYWORDS -DBOOST_ASIO_HAS_STD_ARRAY=1")
 
-if ((BTCB_GUI OR RAIBLOCKS_GUI) AND NOT APPLE)
+add_custom_command(TARGET btcb_node
+				   POST_BUILD
+				   COMMAND btcb_node --generate_config node > ${PROJECT_BINARY_DIR}/config-node.toml.sample
+				   COMMAND btcb_node --generate_config rpc > ${PROJECT_BINARY_DIR}/config-rpc.toml.sample)
+
+if ((NANO_GUI OR RAIBLOCKS_GUI) AND NOT APPLE)
 	install(TARGETS btcb_node
 			RUNTIME DESTINATION .
 	)

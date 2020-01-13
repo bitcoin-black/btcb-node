@@ -1,18 +1,53 @@
 cmake_minimum_required (VERSION 3.4)
+# compatibility for osx sierra and on
+# needs to be set before project
+set (CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "")
+
 project (btcb-node)
+
+# Get the latest abbreviated commit hash of the working branch
+execute_process(
+  COMMAND git log -1 --format=%h
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_COMMIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+option (CI_BUILD false)
 
 set (CPACK_PACKAGE_VERSION_MAJOR "20")
 set (CPACK_PACKAGE_VERSION_MINOR "0")
 set (CPACK_PACKAGE_VERSION_PATCH "0")
 set (CPACK_PACKAGE_VENDOR "Btcb Currency")
 
-set(CMAKE_INSTALL_RPATH "@executable_path/../Frameworks")
+if (CI_BUILD)
+	set (TAG_VERSION_STRING "$ENV{TRAVIS_TAG}")
+else()
+	set (TAG_VERSION_STRING "V${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
+endif()
+
+set (CMAKE_INSTALL_RPATH "@executable_path/../Frameworks")
 # Create all libraries and executables in the root binary dir
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 set (BTCB_GUI OFF CACHE BOOL "")
 set (BTCB_TEST OFF CACHE BOOL "")
 set (BTCB_SECURE_RPC OFF CACHE BOOL "")
+set (BTCB_ROCKSDB OFF CACHE BOOL "")
+set (BTCB_POW_SERVER OFF CACHE BOOL "")
+set (BTCB_WARN_TO_ERR OFF CACHE BOOL "")
+set (BTCB_TIMED_LOCKS 0 CACHE STRING "")
+
+option (BTCB_STACKTRACE_BACKTRACE "Use BOOST_STACKTRACE_USE_BACKTRACE in stacktraces, for POSIX" OFF)
+if (BTCB_STACKTRACE_BACKTRACE)
+	add_definitions(-DBTCB_STACKTRACE_BACKTRACE=1)
+endif ()
+
+if (${BTCB_TIMED_LOCKS} GREATER 0)
+	add_definitions (-DBTCB_TIMED_LOCKS=${BTCB_TIMED_LOCKS})
+endif ()
+
+add_definitions (-DBTCB_ROCKSDB=$<STREQUAL:${BTCB_ROCKSDB},ON>)
 
 option(BTCB_ASAN_INT "Enable ASan+UBSan+Integer overflow" OFF)
 option(BTCB_ASAN "Enable ASan+UBSan" OFF)
@@ -49,7 +84,9 @@ if (WIN32)
 	endif()
 
 else ()
-	add_compile_options(-Werror)
+	if (NANO_WARN_TO_ERR)
+		add_compile_options(-Werror)
+	endif ()
 
 	if ((${USING_TSAN} AND ${USING_ASAN}) OR
 	    (${USING_TSAN} AND ${USING_ASAN_INT}))
@@ -72,7 +109,7 @@ else ()
 	endif()
 
 	if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(i.86|x86(_64)?)$")
-		if (BTCB_SIMD_OPTIMIZATIONS OR RAIBLOCKS_SIMD_OPTIMIZATIONS)
+		if (BTCB_SIMD_OPTIMIZATIONS OR RAIBLOCKS_SIMD_OPTIMIZATIONS OR ENABLE_AVX2)
 			add_compile_options(-msse4)
 			if (ENABLE_AES)
 				add_compile_options(-maes)
@@ -85,14 +122,6 @@ else ()
 							-DCRYPTOPP_DISABLE_AESNI)
 		endif()
 
-		if (ENABLE_AVX2)
-			add_compile_options(-mavx2 -mbmi -mbmi2 -maes)
-			if (PERMUTE_WITH_GATHER)
-				add_definitions(-DPERMUTE_WITH_GATHER)
-			elseif (PERMUTE_WITH_SHUFFLES)
-				add_definitions(-DPERMUTE_WITH_SHUFFLES)
-			endif()
-		endif()
 	elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
 		if (BTCB_SIMD_OPTIMIZATIONS OR RAIBLOCKS_SIMD_OPTIMIZATIONS)
 			add_compile_options(-march=armv8-a+crc+crypto)
@@ -102,6 +131,19 @@ else ()
 		endif ()
 	endif()
 endif ()
+
+if (ENABLE_AVX2)
+	if (WIN32)
+		add_definitions(/arch:AVX2)
+	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(i.86|x86(_64)?)$")
+		add_compile_options(-mavx2 -mbmi -mbmi2 -maes)
+	endif()
+	if (PERMUTE_WITH_GATHER)
+		add_definitions(-DPERMUTE_WITH_GATHER)
+	elseif (PERMUTE_WITH_SHUFFLES)
+		add_definitions(-DPERMUTE_WITH_SHUFFLES)
+	endif()
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -152,11 +194,15 @@ include_directories (${CMAKE_SOURCE_DIR})
 set(Boost_USE_STATIC_LIBS        ON)
 set(Boost_USE_MULTITHREADED      ON)
 
-if (BOOST_ROOT)
-	list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
-endif ()
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
-find_package (Boost 1.67.0 REQUIRED COMPONENTS filesystem log thread program_options system)
+find_package (Boost 1.67.0 REQUIRED COMPONENTS filesystem log log_setup thread program_options system)
+
+if (BTCB_ROCKSDB)
+	find_package (RocksDB REQUIRED)
+	find_package (ZLIB REQUIRED)
+	include_directories (${ROCKSDB_INCLUDE_DIRS})
+endif ()
 
 # There is a compile bug with boost 1.69 interprocess headers on Mac
 if (APPLE AND Boost_VERSION EQUAL 106900)
@@ -165,6 +211,7 @@ else ()
 	set (BOOST_PROCESS_SUPPORTED 1)
 endif ()
 
+include_directories(cpptoml/include)
 add_subdirectory(crypto/ed25519-donna)
 
 set (UPNPC_BUILD_SHARED OFF CACHE BOOL "")
@@ -292,6 +339,9 @@ add_library (blake2
 
 target_compile_definitions(blake2 PRIVATE -D__SSE2__)
 
+if (NANO_POW_SERVER)
+	add_subdirectory(nano-pow-server)
+endif ()
 add_subdirectory(nano/crypto_lib)
 add_subdirectory(nano/secure)
 add_subdirectory(nano/lib)
@@ -301,21 +351,21 @@ add_subdirectory(nano/rpc)
 add_subdirectory(nano/nano_rpc)
 
 if (BTCB_TEST OR RAIBLOCKS_TEST)
-    if(WIN32)
-        if(MSVC_VERSION)
-            if(MSVC_VERSION GREATER_EQUAL 1910)
-                add_definitions(-DGTEST_LANG_CXX11=1)
-                add_definitions(-DGTEST_HAS_TR1_TUPLE=0)
-            endif()
-        endif()
-        set (gtest_force_shared_crt ON)
-    else ()
-        set (gtest_force_shared_crt OFF)
-    endif()
+	if(WIN32)
+		if(MSVC_VERSION)
+			if(MSVC_VERSION GREATER_EQUAL 1910)
+				add_definitions(-DGTEST_LANG_CXX11=1)
+				add_definitions(-DGTEST_HAS_TR1_TUPLE=0)
+			endif()
+		endif()
+		set (gtest_force_shared_crt ON)
+	else ()
+		set (gtest_force_shared_crt OFF)
+	endif()
 
-    add_subdirectory(nano/load_test)
+	add_subdirectory(nano/load_test)
 
-    add_subdirectory (gtest/googletest)
+	add_subdirectory (gtest/googletest)
 	# FIXME: This fixes gtest include directories without modifying gtest's
 	# CMakeLists.txt. Ideally we should use GTest::GTest and GTest::Main as
 	# dependencies but it requires building gtest differently
@@ -328,6 +378,8 @@ if (BTCB_TEST OR RAIBLOCKS_TEST)
 endif ()
 
 if (BTCB_GUI OR RAIBLOCKS_GUI)
+	install (FILES ${PROJECT_BINARY_DIR}/config-node.toml.sample DESTINATION .)
+	install (FILES ${PROJECT_BINARY_DIR}/config-rpc.toml.sample DESTINATION .)
 	if (WIN32)
 		set (PLATFORM_QT_PACKAGES WinExtras)
 	else ()
@@ -345,9 +397,8 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 
 	target_compile_definitions(qt
 		PRIVATE
-		-DBTCB_VERSION_MAJOR=${CPACK_PACKAGE_VERSION_MAJOR}
-		-DBTCB_VERSION_MINOR=${CPACK_PACKAGE_VERSION_MINOR}
-		-DBTCB_VERSION_PATCH=${CPACK_PACKAGE_VERSION_PATCH})
+		-DTAG_VERSION_STRING=${TAG_VERSION_STRING}
+		-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH})
 
 	if (WIN32)
 		set (PLATFORM_GUI_TARGET_PROPERTIES WIN32)
@@ -412,6 +463,7 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 	endif ()
 
 	if (APPLE)
+		set (CPACK_GENERATOR "DragNDrop")
 		CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/Info.plist.in ${CMAKE_SOURCE_DIR}/Info.plist @ONLY)
 		install (TARGETS btcb_wallet DESTINATION Btcb.app/Contents/MacOS)
 		install (TARGETS btcb_node DESTINATION Btcb.app/Contents/MacOS)
@@ -419,11 +471,16 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 		install (FILES Info.plist DESTINATION Btcb.app/Contents)
 		install (FILES qt.conf DESTINATION Btcb.app/Contents/Resources)
 		install (DIRECTORY ${Qt5_DIR}/../../QtCore.framework DESTINATION Btcb.app/Contents/Frameworks)
+		install (DIRECTORY ${Qt5_DIR}/../../QtDBus.framework DESTINATION Btcb.app/Contents/Frameworks)
 		install (DIRECTORY ${Qt5_DIR}/../../QtGui.framework DESTINATION Btcb.app/Contents/Frameworks)
 		install (DIRECTORY ${Qt5_DIR}/../../QtPrintSupport.framework DESTINATION Btcb.app/Contents/Frameworks)
 		install (DIRECTORY ${Qt5_DIR}/../../QtTest.framework DESTINATION Btcb.app/Contents/Frameworks)
 		install (DIRECTORY ${Qt5_DIR}/../../QtWidgets.framework DESTINATION Btcb.app/Contents/Frameworks)
 		install (FILES "${Qt5_DIR}/../../../plugins/platforms/libqcocoa.dylib" DESTINATION Btcb.app/Contents/PlugIns/platforms)
+		if (BTCB_POW_SERVER)
+			install (TARGETS btcb_pow_server DESTINATION Btcb.app/Contents/MacOS)
+			install (DIRECTORY ${PROJECT_SOURCE_DIR}/btcb-pow-server/public DESTINATION Btcb.app/Contents/MacOS)
+		endif()
 		install (FILES Btcb.icns DESTINATION Btcb.app/Contents/Resources)
 	elseif (WIN32)
 		if ("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
@@ -447,7 +504,11 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 		get_target_property (Qt5WindowsPlugin Qt5::QWindowsIntegrationPlugin LOCATION)
 		get_filename_component (Qt5_bin_DIR ${Qt5_DIR}/../../../bin ABSOLUTE)
 		install (TARGETS btcb_wallet DESTINATION .)
-		install (TARGETS btcb_wallet_com DESTINATION .)
+		install (TARGETS btcb_wallet DESTINATION .)
+		if (BTCB_POW_SERVER)
+			install (TARGETS btcb_pow_server DESTINATION .)
+			install (DIRECTORY ${PROJECT_SOURCE_DIR}/btcb-pow-server/public DESTINATION .)
+		endif ()
 		install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${WIN_REDIST} DESTINATION .)
 		install (FILES ${Qt5_bin_DIR}/libGLESv2.dll DESTINATION .)
 		install (FILES ${Qt5_bin_DIR}/Qt5Core.dll DESTINATION .)
@@ -456,12 +517,16 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 		install (FILES ${Qt5_bin_DIR}/Qt5WinExtras.dll DESTINATION .)
 		install (FILES ${Qt5WindowsPlugin} DESTINATION platforms)
 	else ()
+		set(CPACK_GENERATOR "TBZ2")
 		install(TARGETS btcb_wallet
 				RUNTIME DESTINATION .
 		)
+		if (NANO_POW_SERVER)
+			install (TARGETS nano_pow_server DESTINATION .)
+			install (DIRECTORY ${PROJECT_SOURCE_DIR}/nano-pow-server/public DESTINATION .)
+		endif ()
 	endif ()
 endif ()
 
 set (CPACK_RESOURCE_FILE_LICENSE ${CMAKE_SOURCE_DIR}/LICENSE)
-
 include (CPack)

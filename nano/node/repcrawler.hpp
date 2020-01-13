@@ -28,6 +28,7 @@ class node;
 class representative
 {
 public:
+	representative () = default;
 	representative (nano::account account_a, nano::amount weight_a, std::shared_ptr<nano::transport::channel> channel_a) :
 	account (account_a), weight (weight_a), channel (channel_a)
 	{
@@ -36,6 +37,10 @@ public:
 	{
 		return *channel;
 	};
+	bool operator== (nano::representative const & other_a) const
+	{
+		return account == other_a.account;
+	}
 	nano::account account{ 0 };
 	nano::amount weight{ 0 };
 	std::shared_ptr<nano::transport::channel> channel;
@@ -100,14 +105,11 @@ public:
 	/** Get total available weight from representatives */
 	nano::uint128_t total_weight () const;
 
-	/** Request a list of the top \p count_a known representatives. The maximum number of reps returned is 16. */
-	std::vector<representative> representatives (size_t count_a);
+	/** Request a list of the top \p count_a known representatives in descending order of weight. */
+	std::vector<representative> representatives (size_t count_a = std::numeric_limits<size_t>::max ());
 
-	/** Request a list of the top \p count_a known representative endpoints. The maximum number of reps returned is 16. */
+	/** Request a list of the top \p count_a known representative endpoints. */
 	std::vector<std::shared_ptr<nano::transport::channel>> representative_endpoints (size_t count_a);
-
-	/** Returns all representatives registered with weight in descending order */
-	std::vector<nano::representative> representatives_by_weight ();
 
 	/** Total number of representatives */
 	size_t representative_count ();
@@ -132,6 +134,9 @@ private:
 
 	/** Clean representatives with inactive channels */
 	void cleanup_reps ();
+
+	/** Update representatives weights from ledger */
+	void update_weights ();
 
 	/** Protects the probable_reps container */
 	mutable std::mutex probable_reps_mutex;

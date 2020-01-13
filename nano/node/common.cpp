@@ -10,11 +10,18 @@
 
 std::bitset<16> constexpr nano::message_header::block_type_mask;
 std::bitset<16> constexpr nano::message_header::count_mask;
-
+namespace
+{
+nano::protocol_constants const & get_protocol_constants ()
+{
+	static nano::network_params params;
+	return params.protocol;
+}
+}
 nano::message_header::message_header (nano::message_type type_a) :
-version_max (nano::protocol_version),
-version_using (nano::protocol_version),
-version_min (nano::protocol_version_min),
+version_max (get_protocol_constants ().protocol_version),
+version_using (get_protocol_constants ().protocol_version),
+version_min (get_protocol_constants ().protocol_version_min),
 type (type_a)
 {
 }
@@ -40,12 +47,12 @@ void nano::message_header::serialize (nano::stream & stream_a) const
 
 bool nano::message_header::deserialize (nano::stream & stream_a)
 {
-	static nano::network_params network_params;
-	uint16_t extensions_l;
-	std::array<uint8_t, 2> magic_number_l;
 	auto error (false);
 	try
 	{
+		static nano::network_params network_params;
+		uint16_t extensions_l;
+		std::array<uint8_t, 2> magic_number_l;
 		read (stream_a, magic_number_l);
 		if (magic_number_l != network_params.header_magic_number)
 		{
@@ -278,11 +285,7 @@ void nano::message_parser::deserialize_buffer (uint8_t const * buffer_a, size_t 
 		nano::message_header header (error, stream);
 		if (!error)
 		{
-			if (network_constants.is_beta_network () && header.version_using < nano::protocol_version_reasonable_min)
-			{
-				status = parse_status::outdated_version;
-			}
-			else if (header.version_using < nano::protocol_version_min)
+			if (header.version_using < get_protocol_constants ().protocol_version_min)
 			{
 				status = parse_status::outdated_version;
 			}
@@ -554,7 +557,7 @@ block (block_a)
 	header.block_type_set (block->type ());
 }
 
-nano::confirm_req::confirm_req (std::vector<std::pair<nano::block_hash, nano::block_hash>> const & roots_hashes_a) :
+nano::confirm_req::confirm_req (std::vector<std::pair<nano::block_hash, nano::root>> const & roots_hashes_a) :
 message (nano::message_type::confirm_req),
 roots_hashes (roots_hashes_a)
 {
@@ -564,9 +567,9 @@ roots_hashes (roots_hashes_a)
 	header.count_set (static_cast<uint8_t> (roots_hashes.size ()));
 }
 
-nano::confirm_req::confirm_req (nano::block_hash const & hash_a, nano::block_hash const & root_a) :
+nano::confirm_req::confirm_req (nano::block_hash const & hash_a, nano::root const & root_a) :
 message (nano::message_type::confirm_req),
-roots_hashes (std::vector<std::pair<nano::block_hash, nano::block_hash>> (1, std::make_pair (hash_a, root_a)))
+roots_hashes (std::vector<std::pair<nano::block_hash, nano::root>> (1, std::make_pair (hash_a, root_a)))
 {
 	assert (!roots_hashes.empty ());
 	// not_a_block (1) block type for hashes + roots request
@@ -614,13 +617,10 @@ bool nano::confirm_req::deserialize (nano::stream & stream_a, nano::block_unique
 				nano::block_hash block_hash (0);
 				nano::block_hash root (0);
 				read (stream_a, block_hash);
-				if (!block_hash.is_zero ())
+				read (stream_a, root);
+				if (!block_hash.is_zero () || !root.is_zero ())
 				{
-					read (stream_a, root);
-					if (!root.is_zero ())
-					{
-						roots_hashes.push_back (std::make_pair (block_hash, root));
-					}
+					roots_hashes.emplace_back (block_hash, root);
 				}
 			}
 
@@ -792,14 +792,12 @@ bool nano::frontier_req::operator== (nano::frontier_req const & other_a) const
 }
 
 nano::bulk_pull::bulk_pull () :
-message (nano::message_type::bulk_pull),
-count (0)
+message (nano::message_type::bulk_pull)
 {
 }
 
 nano::bulk_pull::bulk_pull (bool & error_a, nano::stream & stream_a, nano::message_header const & header_a) :
-message (header_a),
-count (0)
+message (header_a)
 {
 	if (!error_a)
 	{

@@ -1,23 +1,89 @@
 #!/bin/bash
 
-PATH="${PATH:-/bin}:/usr/bin"
-export PATH
+set -Eeuo pipefail
 
-set -euo pipefail
-IFS=$'\n\t'
+usage() {
+	echo -e \
+	"Usage:\n" \
+	"  $0 btcb_node [daemon] [cli_options] [-l] [-v size]\n" \
+	"    daemon\n" \
+	"      start as daemon\n\n" \
+	"    cli_options\n" \
+	"      btcb_node cli options <see btcb_node --help>\n\n" \
+	"    -l\n" \
+	"      log to console <use docker logs {container}>\n\n" \
+	"    -v<size>\n" \
+	"      vacuum database if over size GB on startup\n\n" \
+	"  $0 bash [other]\n" \
+	"    other\n" \
+	"      bash pass through\n" \
+	"  $0 [*]\n" \
+	"    *\n" \
+	"      usage\n\n" \
+	"default:\n" \
+	"  $0 btcb_node daemon -l"
+}
+
+OPTIND=1
+command=()
+IFS=' ' read -r -a TEMP_OPTS <<<"$@"
+passthrough=()
+db_size=0
+log_to_cerr=0
+
+if [ ${#TEMP_OPTS[@]} -lt 2 ]; then
+	usage
+	exit 1
+fi
+
+if [[ "${TEMP_OPTS[0]}" = 'btcb_node' ]]; then
+	unset 'TEMP_OPTS[0]'
+	command+=("btcb_node")
+	shift;
+	for i in "${TEMP_OPTS[@]}"; do
+		case $i in
+			"daemon" )
+				command+=("--daemon")
+				;;
+			* )
+				passthrough+=("$i")
+				;;
+		esac
+	done
+	for i in "${passthrough[@]}"; do
+		if [[ "$i" =~ ^"-v" ]]; then
+		        db_size=${i//-v/}
+			echo "Vacuum DB if over $db_size GB on startup"
+		elif [[ "$i" = '-l' ]]; then
+			echo "log_to_cerr = true"
+			command+=("--config")
+			command+=("node.logging.log_to_cerr=true")
+		else
+		 	command+=("$i")
+		fi
+	done
+elif [[ "${TEMP_OPTS[0]}" = 'bash' ]]; then
+	unset 'TEMP_OPTS[0]'
+	echo -e "EXECUTING ${TEMP_OPTS[*]}\n"
+	exec "${TEMP_OPTS[@]}"
+	exit 0;
+else
+	usage
+	exit 1;
+fi
 
 network="$(cat /etc/btcb-network)"
 case "${network}" in
-        live|'')
-                network='live'
-                dirSuffix=''
-                ;;
-        beta)
-                dirSuffix='Beta'
-                ;;
-        test)
-                dirSuffix='Test'
-                ;;
+	live|'')
+	network='live'
+	dirSuffix=''
+	;;
+	beta)
+	dirSuffix='Beta'
+	;;
+	test)
+	dirSuffix='Test'
+	;;
 esac
 
 raidir="${HOME}/RaiBlocks${dirSuffix}"
@@ -31,54 +97,22 @@ else
 	mkdir -p "${btcbdir}"
 fi
 
-if [ ! -f "${btcbdir}/config.json" ]; then
-        echo "Config File not found, adding default."
-        cp "/usr/share/btcb/config/${network}.json" "${btcbdir}/config.json"
-        cp "/usr/share/btcb/config/${network}_rpc.json" "${btcbdir}/rpc_config.json"
+if [ ! -f "${btcbdir}/config-node.toml" ] && [ ! -f "${btcbdir}/config.json" ]; then
+	echo "Config file not found, adding default."
+	cp "/usr/share/btcb/config/config-node.toml" "${btcbdir}/config-node.toml"
+	cp "/usr/share/btcb/config/config-rpc.toml" "${btcbdir}/config-rpc.toml"
 fi
 
-# Start watching the log file we are going to log output to
-logfile="${btcbdir}/btcb-docker-output.log"
-tail -F "${logfile}" &
-
-pid=''
-firstTimeComplete=''
-while true; do
-	if [ -n "${firstTimeComplete}" ]; then
-		sleep 10
-	fi
-	firstTimeComplete='true'
-
-	if [ -f "${dbFile}" ]; then
-		dbFileSize="$(stat -c %s "${dbFile}" 2>/dev/null)"
-		if [ "${dbFileSize}" -gt $[1024 * 1024 * 1024 * 20] ]; then
-			echo "ERROR: Database size grew above 20GB (size = ${dbFileSize})" >&2
-
-			while [ -n "${pid}" ]; do
-				kill "${pid}" >/dev/null 2>/dev/null || :
-				if ! kill -0 "${pid}" >/dev/null 2>/dev/null; then
-					pid=''
-				fi
-			done
-
-			btcb_node --vacuum
+if [[ "${command[1]}" = "--daemon" ]]; then
+	if [[ $db_size -ne 0 ]]; then
+		if [ -f "${dbFile}" ]; then
+			dbFileSize="$(stat -c %s "${dbFile}" 2>/dev/null)"
+			if [ "${dbFileSize}" -gt $((1024 * 1024 * 1024 * db_size)) ]; then
+				echo "ERROR: Database size grew above ${db_size}GB (size = ${dbFileSize})" >&2
+				btcb_node --vacuum
+			fi
 		fi
 	fi
-
-	if [ -n "${pid}" ]; then
-		if ! kill -0 "${pid}" >/dev/null 2>/dev/null; then
-			pid=''
-		fi
-	fi
-
-	if [ -z "${pid}" ]; then
-		btcb_node --daemon &
-		pid="$!"
-	fi
-
-	if [ "$(stat -c '%s' "${logfile}")" -gt 4194304 ]; then
-		cp "${logfile}" "${logfile}.old"
-		: > "${logfile}"
-		echo "$(date) Rotated log file"
-	fi
-done >> "${logfile}" 2>&1
+fi
+echo -e "EXECUTING: ${command[*]}\n"
+exec "${command[@]}"
