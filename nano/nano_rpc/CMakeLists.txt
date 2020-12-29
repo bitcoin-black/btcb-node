@@ -20,7 +20,12 @@ target_compile_definitions(btcb_rpc
 		-DGIT_COMMIT_HASH=${GIT_COMMIT_HASH})
 
 if ((BTCB_GUI OR RAIBLOCKS_GUI) AND NOT APPLE)
-	install(TARGETS btcb_rpc
-			RUNTIME DESTINATION .
-	)
+	if (WIN32)
+		install(TARGETS btcb_rpc
+				RUNTIME DESTINATION .
+		)
+	else ()
+		install(TARGETS btcb_rpc
+				RUNTIME DESTINATION ./bin)
+	endif()
 endif()
