@@ -121,7 +121,7 @@ uint64_t nano::work_v1::threshold (nano::block_details const details_a)
 	return result;
 }
 
-#ifndef NANO_FUZZER_TEST
+#ifndef BTCB_FUZZER_TEST
 uint64_t nano::work_v1::value (nano::root const & root_a, uint64_t work_a)
 {
 	uint64_t result;

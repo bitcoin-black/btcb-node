@@ -1385,7 +1385,7 @@ std::shared_ptr<nano::block> nano::deserialize_block (nano::stream & stream_a, n
 			break;
 		}
 		default:
-#ifndef NANO_FUZZER_TEST
+#ifndef BTCB_FUZZER_TEST
 			debug_assert (false);
 #endif
 			break;

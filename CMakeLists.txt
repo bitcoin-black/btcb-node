@@ -1,6 +1,4 @@
 cmake_minimum_required (VERSION 3.4)
-<<<<<<< HEAD
-=======
 
 if (CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
 	#find_package uses <PACKAGENAME>_ROOT variables
@@ -16,16 +14,11 @@ if (CMAKE_VERSION VERSION_LESS 3.13)
 	list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/legacyModules")
 endif ()
 
->>>>>>> upstream/master
 # compatibility for osx sierra and on
 # needs to be set before project
 set (CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "")
 
-<<<<<<< HEAD
 project (btcb-node)
-=======
-project (nano-node)
->>>>>>> upstream/master
 
 # Get the latest abbreviated commit hash of the working branch
 execute_process(
@@ -45,12 +38,8 @@ endif()
 set (CPACK_PACKAGE_VERSION_MAJOR "21")
 set (CPACK_PACKAGE_VERSION_MINOR "0")
 set (CPACK_PACKAGE_VERSION_PATCH "0")
-<<<<<<< HEAD
-set (CPACK_PACKAGE_VENDOR "Btcb Currency")
-=======
 set (CPACK_PACKAGE_VERSION_PRE_RELEASE "0")
-set (CPACK_PACKAGE_VENDOR "Nano Currency")
->>>>>>> upstream/master
+set (CPACK_PACKAGE_VENDOR "Btcb Currency")
 
 if (CI_BUILD)
 	set (TAG_VERSION_STRING "$ENV{TRAVIS_TAG}")
@@ -67,7 +56,6 @@ endif()
 # Create all libraries and executables in the root binary dir
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-<<<<<<< HEAD
 set (BTCB_GUI OFF CACHE BOOL "")
 set (BTCB_TEST OFF CACHE BOOL "")
 set (BTCB_SECURE_RPC OFF CACHE BOOL "")
@@ -75,27 +63,14 @@ set (BTCB_ROCKSDB OFF CACHE BOOL "")
 set (BTCB_POW_SERVER OFF CACHE BOOL "")
 set (BTCB_WARN_TO_ERR OFF CACHE BOOL "")
 set (BTCB_TIMED_LOCKS 0 CACHE STRING "")
+set (BTCB_FUZZER_TEST OFF CACHE BOOL "")
 
 option (BTCB_STACKTRACE_BACKTRACE "Use BOOST_STACKTRACE_USE_BACKTRACE in stacktraces, for POSIX" OFF)
 if (BTCB_STACKTRACE_BACKTRACE)
 	add_definitions(-DBTCB_STACKTRACE_BACKTRACE=1)
-=======
-set (NANO_GUI OFF CACHE BOOL "")
-set (NANO_TEST OFF CACHE BOOL "")
-set (NANO_SECURE_RPC OFF CACHE BOOL "")
-set (NANO_ROCKSDB OFF CACHE BOOL "")
-set (NANO_POW_SERVER OFF CACHE BOOL "")
-set (NANO_WARN_TO_ERR OFF CACHE BOOL "")
-set (NANO_TIMED_LOCKS 0 CACHE STRING "")
-set (NANO_FUZZER_TEST OFF CACHE BOOL "")
-
-option (NANO_STACKTRACE_BACKTRACE "Use BOOST_STACKTRACE_USE_BACKTRACE in stacktraces, for POSIX" OFF)
-if (NANO_STACKTRACE_BACKTRACE)
-	add_definitions(-DNANO_STACKTRACE_BACKTRACE=1)
 	if (BACKTRACE_INCLUDE)
 		add_definitions(-DBOOST_STACKTRACE_BACKTRACE_INCLUDE_FILE=${BACKTRACE_INCLUDE})
 	endif()
->>>>>>> upstream/master
 endif ()
 
 if (${BTCB_TIMED_LOCKS} GREATER 0)
@@ -164,9 +139,9 @@ else ()
 		add_definitions(-DED25519_NO_INLINE_ASM)
 	endif()
 
-	if (NANO_FUZZER_TEST)
+	if (BTCB_FUZZER_TEST)
 		add_compile_options (-fsanitize=fuzzer-no-link -fno-omit-frame-pointer)
-		add_definitions (-DNANO_FUZZER_TEST)
+		add_definitions (-DBTCB_FUZZER_TEST)
 	endif ()
 
 	if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(i.86|x86(_64)?)$")
@@ -238,7 +213,7 @@ else ()
 			set (PLATFORM_LINK_FLAGS "${PLATFORM_LINK_FLAGS} -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/tsan_clang_blacklist")
 		endif()
 	endif()
-	if (NANO_FUZZER_TEST)
+	if (BTCB_FUZZER_TEST)
 		set (PLATFORM_LINK_FLAGS "${PLATFORM_LINK_FLAGS} -fsanitize=fuzzer-no-link")
 	endif ()
 endif ()
@@ -259,19 +234,16 @@ endif ()
 
 include_directories (${CMAKE_SOURCE_DIR})
 
-if (WIN32 AND NANO_TEST AND NANO_SHARED_BOOST)
+if (WIN32 AND BTCB_TEST AND BTCB_SHARED_BOOST)
 	message (SEND_ERROR 
-		" Linking errors occur if NANO_SHARED_BOOST is used with tests on Windows"
-		" Disable NANO_SHARED_BOOST or NANO_TEST on Windows")
-	set(NANO_SHARED_BOOST)
+		" Linking errors occur if BTCB_SHARED_BOOST is used with tests on Windows"
+		" Disable BTCB_SHARED_BOOST or BTCB_TEST on Windows")
+	set(BTCB_SHARED_BOOST)
 endif()
 
-set(NANO_SHARED_BOOST OFF CACHE BOOL "Build Nano with shared boost")
+set(BTCB_SHARED_BOOST OFF CACHE BOOL "Build Btcb with shared boost")
 
-<<<<<<< HEAD
-find_package (Boost 1.67.0 REQUIRED COMPONENTS filesystem log log_setup thread program_options system)
-=======
-if (NANO_SHARED_BOOST)
+if (BTCB_SHARED_BOOST)
 	SET(Boost_USE_STATIC_LIBS OFF)
 	SET(Boost_USE_STATIC_RUNTIME OFF)
 	SET(Boost_NO_BOOST_CMAKE ON)
@@ -284,7 +256,6 @@ set(Boost_USE_MULTITHREADED ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
 find_package (Boost 1.69.0 REQUIRED COMPONENTS filesystem log log_setup thread program_options system)
->>>>>>> upstream/master
 
 if (BTCB_ROCKSDB)
 	find_package (RocksDB REQUIRED)
@@ -430,8 +401,8 @@ add_library (blake2
 
 target_compile_definitions(blake2 PRIVATE -D__SSE2__)
 
-if (NANO_POW_SERVER)
-	add_subdirectory(nano-pow-server)
+if (BTCB_POW_SERVER)
+	add_subdirectory(btcb-pow-server)
 endif ()
 add_subdirectory(nano/crypto_lib)
 add_subdirectory(nano/secure)
@@ -441,10 +412,7 @@ add_subdirectory(nano/nano_node)
 add_subdirectory(nano/rpc)
 add_subdirectory(nano/nano_rpc)
 
-<<<<<<< HEAD
-if (BTCB_TEST OR RAIBLOCKS_TEST)
-=======
-if (NANO_FUZZER_TEST)
+if (BTCB_FUZZER_TEST)
 	if (NOT WIN32)
 		add_subdirectory (nano/fuzzer_test)
 	else ()
@@ -452,8 +420,7 @@ if (NANO_FUZZER_TEST)
 	endif ()
 endif ()
 
-if (NANO_TEST OR RAIBLOCKS_TEST)
->>>>>>> upstream/master
+if (BTCB_TEST OR RAIBLOCKS_TEST)
 	if(WIN32)
 		if(MSVC_VERSION)
 			if(MSVC_VERSION GREATER_EQUAL 1910)
@@ -568,7 +535,6 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 	if (APPLE)
 		set (CPACK_GENERATOR "DragNDrop")
 		CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/Info.plist.in ${CMAKE_SOURCE_DIR}/Info.plist @ONLY)
-<<<<<<< HEAD
 		install (TARGETS btcb_wallet DESTINATION Btcb.app/Contents/MacOS)
 		install (TARGETS btcb_node DESTINATION Btcb.app/Contents/MacOS)
 		install (TARGETS btcb_rpc DESTINATION Btcb.app/Contents/MacOS)
@@ -581,39 +547,22 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 		install (DIRECTORY ${Qt5_DIR}/../../QtTest.framework DESTINATION Btcb.app/Contents/Frameworks)
 		install (DIRECTORY ${Qt5_DIR}/../../QtWidgets.framework DESTINATION Btcb.app/Contents/Frameworks)
 		install (FILES "${Qt5_DIR}/../../../plugins/platforms/libqcocoa.dylib" DESTINATION Btcb.app/Contents/PlugIns/platforms)
+		if (BTCB_SHARED_BOOST)
+			get_filename_component(Boost_LIB_DIR ${BOOST_ROOT}/lib ABSOLUTE)
+			install (FILES ${Boost_LIB_DIR}/libboost_log.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_filesystem.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_log_setup.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_regex.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_program_options.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_system.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_thread.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_date_time.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_chrono.dylib DESTINATION Btcb.app/Contents/boost/lib)
+			install (FILES ${Boost_LIB_DIR}/libboost_atomic.dylib DESTINATION Btcb.app/Contents/boost/lib)
+		endif()
 		if (BTCB_POW_SERVER)
 			install (TARGETS btcb_pow_server DESTINATION Btcb.app/Contents/MacOS)
 			install (DIRECTORY ${PROJECT_SOURCE_DIR}/btcb-pow-server/public DESTINATION Btcb.app/Contents/MacOS)
-=======
-		install (TARGETS nano_wallet DESTINATION Nano.app/Contents/MacOS)
-		install (TARGETS nano_node DESTINATION Nano.app/Contents/MacOS)
-		install (TARGETS nano_rpc DESTINATION Nano.app/Contents/MacOS)
-		install (FILES Info.plist DESTINATION Nano.app/Contents)
-		install (FILES qt.conf DESTINATION Nano.app/Contents/Resources)
-		install (DIRECTORY ${Qt5_DIR}/../../QtCore.framework DESTINATION Nano.app/Contents/Frameworks)
-		install (DIRECTORY ${Qt5_DIR}/../../QtDBus.framework DESTINATION Nano.app/Contents/Frameworks)
-		install (DIRECTORY ${Qt5_DIR}/../../QtGui.framework DESTINATION Nano.app/Contents/Frameworks)
-		install (DIRECTORY ${Qt5_DIR}/../../QtPrintSupport.framework DESTINATION Nano.app/Contents/Frameworks)
-		install (DIRECTORY ${Qt5_DIR}/../../QtTest.framework DESTINATION Nano.app/Contents/Frameworks)
-		install (DIRECTORY ${Qt5_DIR}/../../QtWidgets.framework DESTINATION Nano.app/Contents/Frameworks)
-		install (FILES "${Qt5_DIR}/../../../plugins/platforms/libqcocoa.dylib" DESTINATION Nano.app/Contents/PlugIns/platforms)
-		if (NANO_SHARED_BOOST)
-			get_filename_component(Boost_LIB_DIR ${BOOST_ROOT}/lib ABSOLUTE)
-			install (FILES ${Boost_LIB_DIR}/libboost_log.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_filesystem.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_log_setup.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_regex.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_program_options.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_system.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_thread.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_date_time.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_chrono.dylib DESTINATION Nano.app/Contents/boost/lib)
-			install (FILES ${Boost_LIB_DIR}/libboost_atomic.dylib DESTINATION Nano.app/Contents/boost/lib)
-		endif()
-		if (NANO_POW_SERVER)
-			install (TARGETS nano_pow_server DESTINATION Nano.app/Contents/MacOS)
-			install (DIRECTORY ${PROJECT_SOURCE_DIR}/nano-pow-server/public DESTINATION Nano.app/Contents/MacOS)
->>>>>>> upstream/master
 		endif()
 		install (FILES Btcb.icns DESTINATION Btcb.app/Contents/Resources)
 	elseif (WIN32)
@@ -637,16 +586,9 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 		set (CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
 		get_target_property (Qt5WindowsPlugin Qt5::QWindowsIntegrationPlugin LOCATION)
 		get_filename_component (Qt5_bin_DIR ${Qt5_DIR}/../../../bin ABSOLUTE)
-<<<<<<< HEAD
 		install (TARGETS btcb_wallet DESTINATION .)
-		install (TARGETS btcb_wallet DESTINATION .)
-		if (BTCB_POW_SERVER)
-			install (TARGETS btcb_pow_server DESTINATION .)
-			install (DIRECTORY ${PROJECT_SOURCE_DIR}/btcb-pow-server/public DESTINATION .)
-=======
-		install (TARGETS nano_wallet DESTINATION .)
-		install (TARGETS nano_wallet_com DESTINATION .)
-		if (NANO_SHARED_BOOST)
+		install (TARGETS btcb_wallet_com DESTINATION .)
+		if (BTCB_SHARED_BOOST)
 			foreach(boost_lib IN LISTS Boost_LIBRARIES)
 				if (${CMAKE_BUILD_TYPE} MATCHES "Rel")
 					string(REGEX MATCH "(.+/.*boost_[^-]+-.+-mt-x64.+\)(.lib|a)" boost_lib_name ${boost_lib})
@@ -663,10 +605,9 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 				endif()
 			endforeach(boost_lib)
 		endif()
-		if (NANO_POW_SERVER)
-			install (TARGETS nano_pow_server DESTINATION .)
-			install (DIRECTORY ${PROJECT_SOURCE_DIR}/nano-pow-server/public DESTINATION .)
->>>>>>> upstream/master
+		if (BTCB_POW_SERVER)
+			install (TARGETS btcb_pow_server DESTINATION .)
+			install (DIRECTORY ${PROJECT_SOURCE_DIR}/btcb-pow-server/public DESTINATION .)
 		endif ()
 		install (FILES ${CMAKE_CURRENT_BINARY_DIR}/${WIN_REDIST} DESTINATION .)
 		install (FILES ${Qt5_bin_DIR}/libGLESv2.dll DESTINATION .)
@@ -676,19 +617,13 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 		install (FILES ${Qt5_bin_DIR}/Qt5WinExtras.dll DESTINATION .)
 		install (FILES ${Qt5WindowsPlugin} DESTINATION platforms)
 	else ()
-<<<<<<< HEAD
-		set(CPACK_GENERATOR "TBZ2")
-		install(TARGETS btcb_wallet
-				RUNTIME DESTINATION .
-=======
 		set(CPACK_GENERATOR "TBZ2;DEB")
 		set(CPACK_DEBIAN_PACKAGE_DEPENDS qt5-default)
-		set(CPACK_DEBIAN_PACKAGE_MAINTAINER "russel@nano.org")
-		install(TARGETS nano_wallet
+		set(CPACK_DEBIAN_PACKAGE_MAINTAINER "sonu5650@gmail.com")
+		install(TARGETS btcb_wallet
 				RUNTIME DESTINATION ./bin
->>>>>>> upstream/master
 		)
-		if (NANO_SHARED_BOOST)
+		if (BTCB_SHARED_BOOST)
 			get_filename_component(Boost_LIB_DIR ${BOOST_ROOT}/lib ABSOLUTE)
 			install (FILES ${Boost_LIB_DIR}/libboost_log.so.${Boost_VERSION_STRING} DESTINATION ./lib)
 			install (FILES ${Boost_LIB_DIR}/libboost_filesystem.so.${Boost_VERSION_STRING} DESTINATION ./lib)
@@ -701,9 +636,9 @@ if (BTCB_GUI OR RAIBLOCKS_GUI)
 			install (FILES ${Boost_LIB_DIR}/libboost_chrono.so.${Boost_VERSION_STRING} DESTINATION ./lib)
 			install (FILES ${Boost_LIB_DIR}/libboost_atomic.so.${Boost_VERSION_STRING} DESTINATION ./lib)
 		endif()
-		if (NANO_POW_SERVER)
-			install (TARGETS nano_pow_server DESTINATION ./bin)
-			install (DIRECTORY ${PROJECT_SOURCE_DIR}/nano-pow-server/public DESTINATION ./bin)
+		if (BTCB_POW_SERVER)
+			install (TARGETS btcb_pow_server DESTINATION ./bin)
+			install (DIRECTORY ${PROJECT_SOURCE_DIR}/btcb-pow-server/public DESTINATION ./bin)
 		endif ()
 	endif ()
 endif ()

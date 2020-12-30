@@ -83,25 +83,16 @@ int main (int argc, char * const * argv)
 		("debug_profile_validate", "Profile work validation")
 		("debug_opencl", "OpenCL work generation")
 		("debug_profile_kdf", "Profile kdf function")
-<<<<<<< HEAD
 		("debug_output_last_backtrace_dump", "Displays the contents of the latest backtrace in the event of a btcb_node crash")
-=======
-		("debug_output_last_backtrace_dump", "Displays the contents of the latest backtrace in the event of a nano_node crash")
 		("debug_generate_crash_report", "Consolidates the nano_node_backtrace.dump file. Requires addr2line installed on Linux")
->>>>>>> upstream/master
 		("debug_sys_logging", "Test the system logger")
 		("debug_verify_profile", "Profile signature verification")
 		("debug_verify_profile_batch", "Profile batch signature verification")
 		("debug_profile_bootstrap", "Profile bootstrap style blocks processing (at least 10GB of free storage space required)")
 		("debug_profile_sign", "Profile signature generation")
-<<<<<<< HEAD
 		("debug_profile_process", "Profile active blocks processing (only for btcb_test_network)")
 		("debug_profile_votes", "Profile votes processing (only for btcb_test_network)")
-=======
-		("debug_profile_process", "Profile active blocks processing (only for nano_test_network)")
-		("debug_profile_votes", "Profile votes processing (only for nano_test_network)")
-		("debug_profile_frontiers_confirmation", "Profile frontiers confirmation speed (only for nano_test_network)")
->>>>>>> upstream/master
+		("debug_profile_frontiers_confirmation", "Profile frontiers confirmation speed (only for btcb_test_network)")
 		("debug_random_feed", "Generates output to RNG test suites")
 		("debug_rpc", "Read an RPC command from stdin and invoke it. Network operations will have no effect.")
 		("debug_peers", "Display peer IPv6:port connections")
