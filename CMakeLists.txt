@@ -402,7 +402,7 @@ add_library (blake2
 target_compile_definitions(blake2 PRIVATE -D__SSE2__)
 
 if (BTCB_POW_SERVER)
-	add_subdirectory(btcb-pow-server)
+	add_subdirectory(nano-pow-server)
 endif ()
 add_subdirectory(nano/crypto_lib)
 add_subdirectory(nano/secure)

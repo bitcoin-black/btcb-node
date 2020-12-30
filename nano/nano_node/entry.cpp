@@ -209,7 +209,7 @@ int main (int argc, char * const * argv)
 					std::string get_entry () const
 					{
 						return boost::str (boost::format ("representative %1% hardcoded %2% ledger %3% mismatch %4%")
-						% rep.to_account () % hardcoded.format_balance (nano::Mxrb_ratio, 0, true) % ledger.format_balance (nano::Mxrb_ratio, 0, true) % diff.format_balance (nano::Mxrb_ratio, 0, true));
+						% rep.to_account () % hardcoded.format_balance (nano::Mbcb_ratio, 0, true) % ledger.format_balance (nano::Mbcb_ratio, 0, true) % diff.format_balance (nano::Mbcb_ratio, 0, true));
 					}
 				};
 
@@ -238,13 +238,13 @@ int main (int argc, char * const * argv)
 
 				nano::uint128_union const mismatch_stddev = nano::narrow_cast<nano::uint128_t> (boost::multiprecision::sqrt (mismatch_variance.number ()));
 
-				auto const outlier_threshold = std::max (nano::Gxrb_ratio, mismatch_mean.number () + 1 * mismatch_stddev.number ());
+				auto const outlier_threshold = std::max (nano::Gbcb_ratio, mismatch_mean.number () + 1 * mismatch_stddev.number ());
 				decltype (mismatched) outliers;
 				std::copy_if (mismatched.begin (), mismatched.end (), std::back_inserter (outliers), [outlier_threshold](mismatched_t const & sample) {
 					return sample.diff > outlier_threshold;
 				});
 
-				auto const newcomer_threshold = std::max (nano::Gxrb_ratio, mismatch_mean.number ());
+				auto const newcomer_threshold = std::max (nano::Gbcb_ratio, mismatch_mean.number ());
 				std::vector<std::pair<nano::account, nano::uint128_t>> newcomers;
 				std::copy_if (ledger.begin (), ledger.end (), std::back_inserter (newcomers), [&hardcoded](auto const & rep) {
 					return !hardcoded.count (rep.first) && rep.second;
@@ -254,16 +254,16 @@ int main (int argc, char * const * argv)
 				std::sort (newcomers.begin (), newcomers.end (), [](auto const & left, auto const & right) { return left.second > right.second; });
 
 				auto newcomer_entry = [](auto const & rep) {
-					return boost::str (boost::format ("representative %1% hardcoded --- ledger %2%") % rep.first.to_account () % nano::uint128_union (rep.second).format_balance (nano::Mxrb_ratio, 0, true));
+					return boost::str (boost::format ("representative %1% hardcoded --- ledger %2%") % rep.first.to_account () % nano::uint128_union (rep.second).format_balance (nano::Mbcb_ratio, 0, true));
 				};
 
-				std::cout << boost::str (boost::format ("hardcoded weight %1% Mnano\nledger weight %2% Mnano\nmismatched\n\tsamples %3%\n\ttotal %4% Mnano\n\tmean %5% Mnano\n\tsigma %6% Mnano\n")
-				% total_hardcoded.format_balance (nano::Mxrb_ratio, 0, true)
-				% total_ledger.format_balance (nano::Mxrb_ratio, 0, true)
+				std::cout << boost::str (boost::format ("hardcoded weight %1% Mbcb\nledger weight %2% Mbcb\nmismatched\n\tsamples %3%\n\ttotal %4% Mbcb\n\tmean %5% Mbcb\n\tsigma %6% Mbcb\n")
+				% total_hardcoded.format_balance (nano::Mbcb_ratio, 0, true)
+				% total_ledger.format_balance (nano::Mbcb_ratio, 0, true)
 				% mismatched.size ()
-				% mismatch_total.format_balance (nano::Mxrb_ratio, 0, true)
-				% mismatch_mean.format_balance (nano::Mxrb_ratio, 0, true)
-				% mismatch_stddev.format_balance (nano::Mxrb_ratio, 0, true));
+				% mismatch_total.format_balance (nano::Mbcb_ratio, 0, true)
+				% mismatch_mean.format_balance (nano::Mbcb_ratio, 0, true)
+				% mismatch_stddev.format_balance (nano::Mbcb_ratio, 0, true));
 
 				if (!outliers.empty ())
 				{
@@ -287,7 +287,7 @@ int main (int argc, char * const * argv)
 				}
 
 				// Log more data
-				auto const log_threshold = nano::Gxrb_ratio;
+				auto const log_threshold = nano::Gbcb_ratio;
 				for (auto const & sample : mismatched)
 				{
 					if (sample.diff > log_threshold)
