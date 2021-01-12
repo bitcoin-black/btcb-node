@@ -4,24 +4,12 @@
 </div>
 <hr />
 
-<<<<<<< HEAD
 ### What is BitcoinBlack?
 
 BitcoinBlack is a community based currency focussed on a fair distribution and giving the power back to the people.
 Fee free & Instant transactions are made over a secure decentralized network with very low energy output.<br>
 The current version of Bitcoin Black is built upon a codebase fork of Nano.
 It is neither a hard fork or soft fork of Nano as it does not share the same chain.
-=======
-[![Live Artifacts](https://github.com/nanocurrency/nano-node/workflows/Live/badge.svg)](https://github.com/nanocurrency/nano-node/actions?query=workflow%3ALive)
-[![Beta Artifacts](https://github.com/nanocurrency/nano-node/workflows/Beta/badge.svg)](https://github.com/nanocurrency/nano-node/actions?query=workflow%3ABeta)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/nanocurrency/nano-node)](https://github.com/nanocurrency/nano-node/releases/latest)
-[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/nanocurrency/nano-node?color=darkblue&label=beta)](https://github.com/nanocurrency/nano-node/tags)
-[![Tests](https://github.com/nanocurrency/nano-node/workflows/Tests/badge.svg)](https://github.com/nanocurrency/nano-node/actions?query=workflow%3ATests)
-[![RelWithDebug Tests](https://github.com/nanocurrency/nano-node/workflows/Release%20Tests/badge.svg)](https://github.com/nanocurrency/nano-node/actions?query=workflow%3A%22Release+Tests%22)
-[![Discord](https://img.shields.io/badge/discord-join%20chat-orange.svg)](https://chat.nano.org)
->>>>>>> upstream/master
-
----
 
 ### Key Features
 
